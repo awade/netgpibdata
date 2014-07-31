@@ -1,0 +1,246 @@
+#!/usr/bin/env python
+# Master SR785 measurement script
+# Eric Quintero - 2014
+
+# Standard library imports
+import os, time
+import argparse
+
+# Neccesary external libraries
+import yaml
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Custom libaries
+import SR785
+
+
+def readParams(paramFile):
+    # Function to read a measurement parameter file in the YAML format
+    with open(paramFile,'r') as f:
+        reader = yaml.load_all(f)
+        params = reader.next()
+        reader.close()
+    return(params)
+
+
+def specPlot(dataArray, nDisp, params, legLabel):
+    if nDisp == 2:
+        ## Switch this out if your matplotlib is too old to have plt.subplots 
+        #f =plt.gcf()
+        #axlist=[plt.subplot(211), plt.subplot(212)]
+        f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
+
+        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel)
+        axlist[0].set_title('Channel 1')
+        axlist[1].set_title('Channel 2')
+        axlist[0].set_xscale('log')
+        axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
+        axlist[0].set_yscale('log')
+        axlist[1].set_xscale('log')
+        axlist[1].set_xlabel('Freq. (Hz)')
+        axlist[1].set_yscale('log')
+        axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
+        f.suptitle('SR785 Spectrum Measurement - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        axlist[0].axis('tight')
+        axlist[1].axis('tight')
+        axlist[0].grid('on', which='both')
+        axlist[1].grid('on', which='both')
+        axlist[0].legend()
+        axlist[0].get_legend().get_frame().set_alpha(.5)
+    else:
+        ax=plt.subplot(111)
+        ax.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        ax.set_xscale('log')
+        ax.set_xlabel('Freq. (Hz)')
+        ax.set_ylabel('Magnitude ('+params['dataMode']+')')
+        ax.set_yscale('log')
+        f.suptitle('SR785 Spectrum Measurement - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        ax.axis('tight')
+        ax.grid('on', which='both')
+        ax.legend()
+        ax.get_legend().get_frame().set_alpha(.5)
+
+
+def tfPlot(dataArray,params, legLabel):
+    format = params['dataMode']
+    if format == 'ReIm':
+        Carray = dataArray[:,1] + 1j*dataArray[:,2]
+    elif format =='dBPhDeg':
+        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
+    elif format =='MagPhDeg':
+        Carray = dataArray[:,1] * np.exp(1j*dataArray[:,2]/180.0*np.pi)
+
+    ## Switch this out if your matplotlib is too old to have plt.subplots 
+    #f =plt.gcf()
+    #axlist=[plt.subplot(211), plt.subplot(212)]
+    f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
+    axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
+    axlist[1].plot(dataArray[:,0],np.angle(Carray, deg=True),label=legLabel)
+
+    axlist[0].set_xscale('log')
+    axlist[0].set_ylabel('Magnitude (dB)')
+    axlist[0].set_yscale('linear')
+    axlist[1].set_xscale('log')
+    axlist[1].set_xlabel('Freq. (Hz)')
+    axlist[1].set_yscale('linear')
+    axlist[1].set_ylabel('Phase (deg)')
+    f.suptitle('SR785 TF Measurement - ' + 
+            time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+    axlist[0].axis('tight')
+    axlist[1].axis('tight')
+    axlist[1].set_ylim((-180,180))
+    axlist[0].grid('on', which='both')
+    axlist[1].grid('on', which='both')
+    axlist[1].legend()
+    axlist[1].get_legend().get_frame().set_alpha(.5)
+    
+
+def main(paramFile=None):
+    print('----------------------------------')
+    if paramFile is None:
+        # Set sensible defaults for downloading live data
+        noParam = True
+        params={}
+        params['ipAddress'] = raw_input('Enter IP (hostname or raw): ')
+        params['gpibAddress'] = raw_input('Enter GPIB address (usually 10): ')
+        params['nameRoot'] = 'SR785'
+        params['saveDir'] = os.getcwd()+'/'
+        params['plotRefs'] = False
+        params['plotResult'] = False
+    else:
+        noParam = False
+        print('Reading parameters from '+paramFile)
+        params=readParams(paramFile)
+        params['fileName']=paramFile
+
+    gpibObj = SR785.connectGPIB(params['ipAddress'], params['gpibAddress'])
+
+    # Set up output file names
+    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    fileRoot = (params['nameRoot'] + '_' + 
+                time.strftime('%d-%m-%Y', time.localtime()) + 
+                time.strftime('_%H%M%S', time.localtime()))
+    dataFileName = fileRoot+'.txt'
+    outDir = params['saveDir'];
+
+    # If new measurement is requested, do it!
+    if noParam is False:
+        SR785.setParameters(gpibObj,params)
+        SR785.measure(gpibObj,params['measType'])
+    
+    # Find out number of displays on the screen
+    nDisp=int(gpibObj.query("DFMT?"))
+    if nDisp == 3:
+        nDisp=1
+    nDisp = nDisp + 1
+
+    # Let the instrument catch up, then download the data
+    time.sleep(2)
+    (freq, data) = SR785.download(gpibObj, nDisp)
+
+    # Done measuring! Just output file writing and plotting below
+    print('Saving files to '+outDir)
+    print('Measurement data will be written into '+outDir+dataFileName)
+
+    with open(outDir + dataFileName,'w') as dataFile:
+        SR785.writeHeader(dataFile, params['timeStamp'])
+        if noParam is False: dataFile.write('# Paramter File: ' 
+                                            + params['fileName']+'\n')
+        SR785.writeParams(gpibObj, dataFile)
+        print('Writing measurement data to file...')
+
+        #Write data vectors
+        for i in range(len(freq)):
+            if nDisp == 2:
+                dataFile.write(freq[i]+'    '+data[0][i]+
+                               '     '+data[1][i]+'\n')
+            else:
+                dataFile.write(freq[i]+'    '+data[0][i] + '\n')
+        dataFile.close()
+
+    print "Done!"
+    gpibObj.close()
+
+    if params['plotResult'] is True:
+        print 'Plotting!'
+        dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
+                                            np.array(data,dtype='float'))))
+
+        if params['plotRefs'] is True:
+            # Get list of files with the same nameRoot
+            refFiles = [ rf for rf in os.listdir(params['refDir']) 
+                         if (params['nameRoot'] in rf and '.txt' in rf and
+                             rf != dataFileName)]
+            print 'Found ' + str(len(refFiles)) + ' references; plotting...'
+
+            # Plot each reference in order
+            refFiles.sort()
+            for filename in refFiles:
+                refArray = np.loadtxt(params['refDir']+filename,comments='#')
+
+                # Find timestamp of Ref for the legend
+                with open(params['refDir']+filename,'r') as rf:
+                    tLine = [line for i, line in enumerate(rf) if i==1]
+
+                if params['measType'] == 'Spectrum':
+                    specPlot(refArray, nDisp, params,
+                             tLine[0][tLine[0].find(':')+2:-1])
+                elif params['measType'] == 'TF':
+                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1])
+
+        if params['measType'] == 'Spectrum':
+            specPlot(dataArray, nDisp, params,params['timeStamp'])
+        elif params['measType'] == 'TF':
+            tfPlot(dataArray,params,params['timeStamp'])
+
+        plt.gcf().set_size_inches(11,8)
+        if params['saveFig'] is True:
+            plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
+        plt.show()    
+
+
+if __name__ == "__main__":
+    # Set location of template files, should live with the script
+    scriptPath = os.path.dirname(os.path.realpath(__file__))
+    SPtemplateFile = scriptPath + '/SPSR785template.yml'
+    TFtemplateFile = scriptPath + '/TFSR785template.yml'
+
+    parser = argparse.ArgumentParser() 
+    parser.add_argument('paramFile', nargs='?',
+                        help = 'The Parameter file for the measurement. ' \
+                               'If not specified, downloads data from the '\
+                               'live display of the instrument.',
+                        default=None)
+    parser.add_argument('--template', help='Copy template parameter files to'\
+                                           ' current dir; no measurement is'\
+                                           ' made.',
+                        action='store_true')
+    parser.add_argument('--reset', help='Resets an SR785, IP and GPIB address'\
+                                        ' are required.',
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    if args.template:
+        import shutil
+        print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
+        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPSR785template.yml')
+        print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
+        shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
+        print 'Done!'
+
+    elif args.reset:
+        ipAdd = raw_input('Enter IP (hostname or raw): ')
+        gpibAdd = raw_input('Enter GPIB address (usually 10): ')
+        gpibObj = SR785.connectGPIB(ipAdd, gpibAdd)
+        SR785.reset(gpibObj)
+
+    else:
+        if args.paramFile is None:
+            print 'No parameter file specified! '\
+                  'Will download from current display...'
+        main(args.paramFile)

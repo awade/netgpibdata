@@ -1,0 +1,39 @@
+# Analyzer Details
+analyzer:       SR785
+ipAddress:      vanna     # Ip or hostname of GPIB Device
+gpibAddress:    10        # port of GPIB device (10) is default 
+
+# Output Parameters
+saveDir:        ./        # Path where output is saved, use './' for current dir
+nameRoot:       TFSR785   # Filename root for output files
+plotResult:     True      # Whether to plot measured data when finished 
+plotRefs:       False     # Whether to plot reference traces along with measurement
+refDir:         ./        # Where the reference trace files are stored
+                          # References are found by files with same nameRoot
+saveFig:        True      # If plotResult is true, saves a pdf with same filename
+
+# Measurement Parameters
+measType:       TF
+startFreq:      100kHz    # Start frequency, 102.4Khz Max
+stopFreq:       100Hz   
+numOfPoints:    300
+sweepType:      Log       # Sweep type: Log or Linear (default: Log)
+excAmp:         15mV      # Excitation amplitude
+excOff:         0mV       # Excitation offset
+#settleTime:    .1        # Settle time
+#intTime:       1         # Integration Time
+settleCycles:   1         # Settle cycles
+intCycles:      5         # Integration cycles
+
+# Analyzer Settings
+arMode:         UpOnly    # Auto range mode: UpOnly or Tracking (default: UpOnly)
+dataMode:       dBPhDeg   # "dBPhDeg", "MagPhDeg" or "ReIm"
+dualchannel:    single    # "single"/"dual" chan mode
+avgMode:        RMS       # Averaging mode: "None, Vector, RMS or PeakHold"
+inputCoupling1: AC        # CH1 input coupling. "DC" or "AC"
+inputDiff1:     A         # CH1 input Differential "A-B", or single ended "A"
+inputCoupling2: AC        # CH2 input coupling. "DC" or "AC"
+inputDiff2:     A         # CH2 input Differential "A-B", or single ended "A"
+inputGND1:      Float     # CH1 input grounding. "Float" or "Ground"
+inputGND2:      Float     # CH2 input grounding. "Float" or "Ground"
+baseFreq:       102.4kHz  # Base Freq "102.4kHz" or "100.0kHz" 
