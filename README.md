@@ -17,3 +17,5 @@ Python package dependencies:
 - numpy
 - matplotlib
 - yaml 
+
+Older scripts for the SR785 are included in the "oldScripts" directory. 
