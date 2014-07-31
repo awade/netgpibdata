@@ -11,6 +11,8 @@ Without any arguments, the programs asks for the IP and GPIB address for the des
 
 Through the use of a template file, a measurement can be fully defined and ran remotely, with options to plot the results and previous measurements with matplotlib. Example template files for PSD and frequency response measurements are included, which have some explanation of what the different arguments expect and define. In addition, the program has the option to copy the template files to the user's current working directory to be modified as desired for a specific measurement. 
 
+Usage information is availble by running "SRmeasure -h" in a terminal.
+
 Python package dependencies:
 - numpy
 - matplotlib
