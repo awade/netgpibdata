@@ -1,0 +1,220 @@
+#!/usr/bin/env python
+
+
+import os
+import re
+import argparse
+import time
+import netgpib
+import AG4395A
+import numpy as np
+import matplotlib.pyplot as plt
+import yaml
+
+# FMTNOISE
+
+def readParams(paramFile):
+    # Function to read a measurement parameter file in the YAML format
+    with open(paramFile,'r') as f:
+        reader = yaml.load_all(f)
+        params = reader.next()
+        reader.close()
+    return(params)
+
+
+def specPlot(dataArray, nDisp, params, legLabel):
+    if nDisp == 2:
+        f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
+
+        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel)
+        axlist[0].set_title('Channel 1')
+        axlist[1].set_title('Channel 2')
+        axlist[0].set_xscale('log')
+        axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
+        axlist[0].set_yscale('log')
+        axlist[1].set_xscale('log')
+        axlist[1].set_xlabel('Freq. (Hz)')
+        axlist[1].set_yscale('log')
+        axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
+        f.suptitle('SR785 Spectrum Measurement - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        axlist[0].axis('tight')
+        axlist[1].axis('tight')
+        axlist[0].grid('on', which='both')
+        axlist[1].grid('on', which='both')
+        axlist[0].legend()
+        axlist[0].get_legend().get_frame().set_alpha(.5)
+    else:
+        ax=plt.subplot(111)
+        ax.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        ax.set_xscale('log')
+        ax.set_xlabel('Freq. (Hz)')
+        ax.set_ylabel('Magnitude ('+params['dataMode']+')')
+        ax.set_yscale('log')
+        f.suptitle('SR785 Spectrum Measurement - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        ax.axis('tight')
+        ax.grid('on', which='both')
+        ax.legend()
+        ax.get_legend().get_frame().set_alpha(.5)
+
+
+def main(paramFile=None):
+    print('----------------------------------')
+    if paramFile is None:
+        # Set sensible defaults for downloading live data
+        noParam = True
+        params={}
+        params['ipAddress'] = raw_input('Enter IP (hostname or raw): ')
+        params['gpibAddress'] = raw_input('Enter GPIB address (usually 10): ')
+        params['nameRoot'] = 'AG4395A'
+        params['saveDir'] = os.getcwd()+'/'
+        params['plotRefs'] = False
+        params['plotResult'] = False
+        params['nSegment'] = 1
+    else:
+        noParam = False
+        print('Reading parameters from '+paramFile)
+        params=readParams(paramFile)
+        params['fileName']=paramFile
+
+    gpibObj = netgpib.netGPIB(params['ipAddress'], params['gpibAddress'],'\004',0)
+
+    # Set up output file names
+    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    fileRoot = (params['nameRoot'] + '_' + 
+                time.strftime('%d-%m-%Y', time.localtime()) + 
+                time.strftime('_%H%M%S', time.localtime()))
+    dataFileName = fileRoot+'.txt'
+    outDir = params['saveDir'];
+
+    # If new measurement is requested, do it!
+    if noParam is False:
+        AG4395A.setParameters(gpibObj,params)
+    # Break up frequencies for psuedolog    
+    nseg = params['nSegment']
+
+    if noParam is False and int(nseg) > 1:
+        # We're doing a pseudo-log sweep!
+        # Need to find segment limits...
+        unitDict={'MHz':1e6,'kHz':1e3,'Hz':1.0,'mHz':1e-3}
+        f1m = re.search('([0-9]+)([A-Za-z]+)',params['startFreq'])
+        f2m = re.search('([0-9]+)([A-Za-z]+)',params['stopFreq'])
+        f1 = float(f1m.group(1))*unitDict[f1m.group(2)]
+        f2 = float(f2m.group(1))*unitDict[f2m.group(2)]
+
+        fLims = round(np.logspace(np.log10(f1),np.log10(f2),nseg+1))
+        
+        # Loop over segments and measure
+        for ii in range(len(nseg)):
+            gpibObj.command('STAR '+str(fLims[ii]))
+            time.sleep(0.1)
+            gpibObj.command('STOP '+str(fLims[ii+1]))
+            time.sleep(0.1)
+
+            print 'Segment '+str(ii+1)+' of '+nseg+'...'
+            AG4395A.measure(gpibObj,params)
+            (fi, di) = AG4395A.downloadData(gpibObj,params)
+
+            if ii==0:
+                freq=fi
+                data=di
+            else:
+                freq.extend(fi)
+                data.extend(di)
+    else:
+        AG4395A.measure(gpibObj,params)
+        (freq, data) = AG4395A.downloadData(gpibObj,params)
+
+    # Done measuring! Just output file writing and plotting below
+    print('Saving files to '+outDir)
+    print('Measurement data will be written into '+outDir+dataFileName)
+
+    with open(outDir + dataFileName,'w') as dataFile:
+        #SR785.writeHeader(dataFile, params['timeStamp'])
+        if noParam is False: dataFile.write('# Paramter File: ' 
+                                            + params['fileName']+'\n')
+        #SR785.writeParams(gpibObj, dataFile)
+        print('Writing measurement data to file...')
+
+        #Write data vectors
+        for i in range(len(freq)):
+            dataFile.write(str(freq[i])+'    '
+                           + '    '.join([str(val) for val in data[i,:]])+'\n')
+
+    print "Done!"
+    gpibObj.close()
+
+    if params['plotResult'] is True:
+        print 'Plotting not done yet, sorry!'
+   #     print 'Plotting!'
+   #     dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
+   #                                         np.array(data,dtype='float'))))
+
+   #     if params['plotRefs'] is True:
+   #         # Get list of files with the same nameRoot
+   #         refFiles = [ rf for rf in os.listdir(params['refDir']) 
+   #                      if (params['nameRoot'] in rf and '.txt' in rf and
+   #                          rf != dataFileName)]
+   #         print 'Found ' + str(len(refFiles)) + ' references; plotting...'
+
+   #         # Plot each reference in order
+   #         refFiles.sort()
+   #         for filename in refFiles:
+   #             refArray = np.loadtxt(params['refDir']+filename,comments='#')
+
+   #             # Find timestamp of Ref for the legend
+   #             with open(params['refDir']+filename,'r') as rf:
+   #                 tLine = [line for i, line in enumerate(rf) if i==1]
+
+   #             if params['measType'] == 'Spectrum':
+   #                 specPlot(refArray, nDisp, params,
+   #                          tLine[0][tLine[0].find(':')+2:-1])
+   #             elif params['measType'] == 'TF':
+   #                 tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1])
+
+   #     if params['measType'] == 'Spectrum':
+   #         specPlot(dataArray, nDisp, params,params['timeStamp'])
+   #     elif params['measType'] == 'TF':
+   #         tfPlot(dataArray,params,params['timeStamp'])
+
+   #     plt.gcf().set_size_inches(11,8)
+   #     if params['saveFig'] is True:
+   #         plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
+   #     plt.show()    
+
+
+if __name__ == "__main__":
+    # Set location of template files, should live with the script
+    scriptPath = os.path.dirname(os.path.realpath(__file__))
+    SPtemplateFile = scriptPath + '/SPAG4395template.yml'
+    TFtemplateFile = scriptPath + '/NWAG4395template.yml'
+
+    parser = argparse.ArgumentParser() 
+    parser.add_argument('paramFile', nargs='?',
+                        help = 'The Parameter file for the measurement. ' \
+                               'If not specified, downloads data from the '\
+                               'live display of the instrument.',
+                        default=None)
+    parser.add_argument('--template', help='Copy template parameter files to'\
+                                           ' current dir; no measurement is'\
+                                           ' made.',
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    if args.template:
+        import shutil
+        print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
+        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPSR785template.yml')
+        print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
+        shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
+        print 'Done!'
+
+    else:
+        if args.paramFile is None:
+            print 'No parameter file specified! '\
+                  'Will download from current display...'
+        main(args.paramFile)
+
