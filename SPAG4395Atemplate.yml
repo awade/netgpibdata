@@ -18,9 +18,9 @@ stopFreq:     10MHz            ## Stop frequency, 300MHz max
 nSegment:     5                 ## Number of segments to logarithmically split measurement into
                                 ## (I.e. pseudo-log sweep)
 specType:     Noise             ## "Noise" (i.e. PSD units) or "Spectrum" (power units)
-dualChannel:  Single            ## "Single"/"Dual"
-channels:     A                ## "R", "A", "B" for single channel. "RA","AB", etc. for dual
-attenuation:  10                ## dB of input attenuation
+dualChannel:  Dual            ## "Single"/"Dual"
+channels:     AB              ## "R", "A", "B" for single channel. "RA","AB", etc. for dual
+attenuation:  auto                ## dB of input attenuation, i.e. 40, or 'auto' 
 averages:     1                 ## Number of averages (1=no averaging)
 #ifBW:         10000               ## IF bandwidth in Hz. Changes number of points - max number of points is 801
-bwSpanRatio: 0.2                ## Set resolution bandwidth / span ratio, in percent. 0.01 to 10
+bwSpanRatio: 0.3                ## Set resolution bandwidth / span ratio, in percent. 0.01 to 10

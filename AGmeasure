@@ -96,6 +96,7 @@ def main(paramFile=None):
         AG4395A.setParameters(gpibObj,params)
     # Break up frequencies for psuedolog    
     nseg = params['nSegment']
+    nDisp = int(gpibObj.query('DUAC?')[0])+1
 
     if noParam is False and int(nseg) > 1:
         # We're doing a pseudo-log sweep!
@@ -110,10 +111,14 @@ def main(paramFile=None):
         
         # Loop over segments and measure
         for ii in range(nseg):
+            if nDisp == 2:
+                gpibObj.command('CHAN1')
+                gpibObj.command('STAR '+str(fLims[ii]))
+                gpibObj.command('STOP '+str(fLims[ii+1]))
+                gpibObj.command('CHAN2')
             gpibObj.command('STAR '+str(fLims[ii]))
-            time.sleep(0.1)
             gpibObj.command('STOP '+str(fLims[ii+1]))
-            time.sleep(0.1)
+            time.sleep(2)
             print 'Segment '+str(ii+1)+' of '+str(nseg)+'...'
             AG4395A.measure(gpibObj,params)
             (fi, di) = AG4395A.downloadData(gpibObj,params)
@@ -125,6 +130,7 @@ def main(paramFile=None):
                 freq=np.concatenate((freq,fi))
                 data=np.concatenate((data,di))
     else:
+        print 'foo'
         AG4395A.measure(gpibObj,params)
         (freq, data) = AG4395A.downloadData(gpibObj,params)
 

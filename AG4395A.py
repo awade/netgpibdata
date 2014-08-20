@@ -14,13 +14,6 @@ def setParameters(gpibObj, params):
     gpibObj.command('SA')
     time.sleep(0.1)
 
-    # Spectrum or noise?
-
-    if params['specType'].lower() == 'noise':
-        gpibObj.command('FMT '+params['specType'][0:5].upper())
-    elif params['specType'].lower() != 'spectrum':
-        raise ValueError('specType not parsing!')
-
     # Set up channel inputs
     if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2: 
         gpibObj.command('DUAC ON')
@@ -31,6 +24,10 @@ def setParameters(gpibObj, params):
         time.sleep(0.1)
         gpibObj.command('MEAS '+params['channels'][jj])
         time.sleep(0.1)
+        if params['specType'].lower() == 'noise':
+            gpibObj.command('FMT '+params['specType'][0:5].upper())
+        elif params['specType'].lower() != 'spectrum':
+            raise ValueError('specType not parsing!')
         
         # For now, default noise to V^2/Hz and spectrum to dBm
         if params['specType'].lower() =='noise':
@@ -47,15 +44,21 @@ def setParameters(gpibObj, params):
         gpibObj.command('STOP '+params['stopFreq'])
         time.sleep(0.1)
         gpibObj.command('BWAUTO ON')
-        time.sleep(0,1)
+        time.sleep(0.1)
         gpibObj.command('BWSRAT '+str(params['bwSpanRatio']))
         time.sleep(0.1)
-        gpibObj.command('ATTAUTO OFF')
-        time.sleep(0.1)
-        gpibObj.command('ATT' +str(jj+1) +' ' +str(params['attenuation'])+'DB')
-        time.sleep(0.1)
+        if isinstance(params['attenuation'], basestring):
+            if params['attenuation'].lower() == 'auto':
+                gpibObj.command('ATTAUTO ON')
+            else:
+                raise ValueError('Attenuation String not parseable!')
+        else:
+            gpibObj.command('ATTAUTO OFF')
+            time.sleep(0.1)
+            gpibObj.command('ATT' +params['channels'][jj] +' ' +str(params['attenuation'])+'DB')
+            time.sleep(0.1)
 
-    time.sleep(1)
+    time.sleep(12)
     print('Parameters set!')
 
 def measure(gpibObj, params):
