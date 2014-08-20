@@ -7,7 +7,7 @@ import time
 #import netgpib
 import numpy as np
 
-def setParamters(gpibObj, params): 
+def setParameters(gpibObj, params): 
     # Spectrum only so far!
     gpibObj.command('PRES')
     time.sleep(0.1)
@@ -22,15 +22,13 @@ def setParamters(gpibObj, params):
         raise ValueError('specType not parsing!')
 
     # Set up channel inputs
-    if params['dualChan'].lower() == 'dual' and len(params['channels'])==2: 
+    if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2: 
         gpibObj.command('DUAC ON')
         time.sleep(0.1)
-    else:
-        gpibObj.command('MEAS '+params['channels'][0])
 
     for jj in range(len(params['channels'])): 
-
         gpibObj.command('CHAN'+str(jj+1))
+        time.sleep(0.1)
         gpibObj.command('MEAS '+params['channels'][jj])
         time.sleep(0.1)
         
@@ -39,8 +37,8 @@ def setParamters(gpibObj, params):
             gpibObj.command('SAUNIT V')
         else:
             gpibObj.command('SAUNIT DBM')
-
-        gpibObj.command('AVERFACT '+params['averages'])
+        time.sleep(0.1)
+        gpibObj.command('AVERFACT '+str(params['averages']))
         time.sleep(0.1)
         # Stops measurement from proceeding for now?
         gpibObj.command('AVER OFF')
@@ -48,19 +46,20 @@ def setParamters(gpibObj, params):
         time.sleep(0.1)
         gpibObj.command('STOP '+params['stopFreq'])
         time.sleep(0.1)
-        gpibObj.command('BW '+params['ifBW'])
+        gpibObj.command('BW '+str(params['ifBW']))
         time.sleep(0.1)
         gpibObj.command('ATTAUTO OFF')
         time.sleep(0.1)
-        gpibObj.command('ATT' +str(jj+1) +' ' +params['attentuation']+'DB')
+        gpibObj.command('ATT' +str(jj+1) +' ' +str(params['attenuation'])+'DB')
         time.sleep(0.1)
 
+    time.sleep(1)
     print('Parameters set!')
 
 def measure(gpibObj, params):
     nDisp = int(gpibObj.query('DUAC?')[0])+1
     tim = gpibObj.query("SWET?")
-    tot_time = float(tim)*(int(params['averages'])+1)
+    tot_time = float(tim)*(params['averages']+1)
 
     for disp in range(nDisp):
         gpibObj.command('CHAN'+str(disp+1))
@@ -69,7 +68,7 @@ def measure(gpibObj, params):
         time.sleep(0.1)
         gpibObj.command("AVERREST") #Start measurement
 
-    print('Running...')
+    print('Running for '+str(tot_time)+' seconds...')
     # Is this really the best way? Can't I query the number of averages, like sr785?
     # Yes! Read page 5-14 in programming manual, need to figure out how to implement.
     time.sleep(tot_time)
@@ -101,7 +100,7 @@ def downloadData(gpibObj, params):
 
         dataList=[]
 
-        if bool(gpibObj.query('DUAC?')):
+        if gpibObj.query('DUAC?')[0] == '1':
             for ii in range(2):
                 gpibObj.command('CHAN'+str(ii+1))
                 time.sleep(0.5)

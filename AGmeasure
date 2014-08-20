@@ -73,6 +73,7 @@ def main(paramFile=None):
         params['plotRefs'] = False
         params['plotResult'] = False
         params['nSegment'] = 1
+        params['averages'] = 1
     else:
         noParam = False
         print('Reading parameters from '+paramFile)
@@ -91,6 +92,7 @@ def main(paramFile=None):
 
     # If new measurement is requested, do it!
     if noParam is False:
+        print 'Setting up measurement parameters...'
         AG4395A.setParameters(gpibObj,params)
     # Break up frequencies for psuedolog    
     nseg = params['nSegment']
@@ -104,16 +106,15 @@ def main(paramFile=None):
         f1 = float(f1m.group(1))*unitDict[f1m.group(2)]
         f2 = float(f2m.group(1))*unitDict[f2m.group(2)]
 
-        fLims = round(np.logspace(np.log10(f1),np.log10(f2),nseg+1))
+        fLims = np.round(np.logspace(np.log10(f1),np.log10(f2),nseg+1))
         
         # Loop over segments and measure
-        for ii in range(len(nseg)):
+        for ii in range(nseg):
             gpibObj.command('STAR '+str(fLims[ii]))
             time.sleep(0.1)
             gpibObj.command('STOP '+str(fLims[ii+1]))
             time.sleep(0.1)
-
-            print 'Segment '+str(ii+1)+' of '+nseg+'...'
+            print 'Segment '+str(ii+1)+' of '+str(nseg)+'...'
             AG4395A.measure(gpibObj,params)
             (fi, di) = AG4395A.downloadData(gpibObj,params)
 
@@ -121,8 +122,8 @@ def main(paramFile=None):
                 freq=fi
                 data=di
             else:
-                freq.extend(fi)
-                data.extend(di)
+                freq=np.concatenate((freq,fi))
+                data=np.concatenate((data,di))
     else:
         AG4395A.measure(gpibObj,params)
         (freq, data) = AG4395A.downloadData(gpibObj,params)

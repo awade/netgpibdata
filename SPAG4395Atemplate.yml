@@ -13,13 +13,13 @@ saveFig:      True              ## If plotResult is true, saves a pdf with same 
 
 # Measurement Parameters
 measType:     Spectrum          
-startFreq:    1MHz              ## Start frequency
+startFreq:    300kHz              ## Start frequency
 stopFreq:     300MHz            ## Stop frequency, 300MHz max
 nSegment:     3                 ## Number of segments to logarithmically split measurement into
                                 ## (I.e. pseudo-log sweep)
 specType:     Noise             ## "Noise" (i.e. PSD units) or "Spectrum" (power units)
 dualChannel:  Single            ## "Single"/"Dual"
-channels:     A                 ## "R", "A", "B" for single channel. "RA","AB", etc. for dual
+channels:     A                ## "R", "A", "B" for single channel. "RA","AB", etc. for dual
 attenuation:  10                ## dB of input attenuation
 averages:     1                 ## Number of averages (1=no averaging)
-ifBW:         300               ## IF bandwidth in Hz. Changes number of points - max number of points is 801
+ifBW:         10000               ## IF bandwidth in Hz. Changes number of points - max number of points is 801
