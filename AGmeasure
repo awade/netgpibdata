@@ -22,12 +22,18 @@ def readParams(paramFile):
     return(params)
 
 
-def specPlot(dataArray, nDisp, params, legLabel):
+def specPlot(data, nDisp, params, legLabel):
+
+    if params['specType'] == 'Noise':
+        params['dataMode']='V/rtHz'
+    else:
+        params['dataMode']='dBm'
+
     if nDisp == 2:
         f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
 
-        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel)
-        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel)
+        axlist[0].plot(data[:,0],data[:,1],label=legLabel)
+        axlist[1].plot(data[:,0],data[:,2],label=legLabel)
         axlist[0].set_title('Channel 1')
         axlist[1].set_title('Channel 2')
         axlist[0].set_xscale('log')
@@ -37,8 +43,8 @@ def specPlot(dataArray, nDisp, params, legLabel):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        f.suptitle('SR785 Spectrum Measurement - ' + 
-                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        f.suptitle('AG4395 Spectrum Measurement - ' + 
+                params['timeStamp'])
         axlist[0].axis('tight')
         axlist[1].axis('tight')
         axlist[0].grid('on', which='both')
@@ -46,14 +52,14 @@ def specPlot(dataArray, nDisp, params, legLabel):
         axlist[0].legend()
         axlist[0].get_legend().get_frame().set_alpha(.5)
     else:
-        ax=plt.subplot(111)
-        ax.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        f,ax=plt.subplots()
+        ax.plot(data[:,0],data[:,1],label=legLabel)
         ax.set_xscale('log')
         ax.set_xlabel('Freq. (Hz)')
         ax.set_ylabel('Magnitude ('+params['dataMode']+')')
         ax.set_yscale('log')
-        f.suptitle('SR785 Spectrum Measurement - ' + 
-                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        f.suptitle('AG4395 Spectrum Measurement - ' + 
+                params['timeStamp'])
         ax.axis('tight')
         ax.grid('on', which='both')
         ax.legend()
@@ -139,8 +145,8 @@ def main(paramFile=None):
     print('Measurement data will be written into '+outDir+dataFileName)
 
     with open(outDir + dataFileName,'w') as dataFile:
-        #SR785.writeHeader(dataFile, params['timeStamp'])
-        if noParam is False: dataFile.write('# Paramter File: ' 
+        AG4395A.writeHeader(dataFile, params['timeStamp'])
+        if noParam is False: dataFile.write('# Parameter File: ' 
                                             + params['fileName']+'\n')
         #SR785.writeParams(gpibObj, dataFile)
         print('Writing measurement data to file...')
@@ -154,42 +160,34 @@ def main(paramFile=None):
     gpibObj.close()
 
     if params['plotResult'] is True:
-        print 'Plotting not done yet, sorry!'
-   #     print 'Plotting!'
-   #     dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
-   #                                         np.array(data,dtype='float'))))
 
-   #     if params['plotRefs'] is True:
-   #         # Get list of files with the same nameRoot
-   #         refFiles = [ rf for rf in os.listdir(params['refDir']) 
-   #                      if (params['nameRoot'] in rf and '.txt' in rf and
-   #                          rf != dataFileName)]
-   #         print 'Found ' + str(len(refFiles)) + ' references; plotting...'
+        if params['plotRefs'] is True:
+            # Get list of files with the same nameRoot
+            refFiles = [ rf for rf in os.listdir(params['refDir']) 
+                         if (params['nameRoot'] in rf and '.txt' in rf and
+                             rf != dataFileName)]
+            print 'Found ' + str(len(refFiles)) + ' references; plotting...'
 
-   #         # Plot each reference in order
-   #         refFiles.sort()
-   #         for filename in refFiles:
-   #             refArray = np.loadtxt(params['refDir']+filename,comments='#')
+            # Plot each reference in order
+            refFiles.sort()
+            for filename in refFiles:
+                refArray = np.loadtxt(params['refDir']+filename,comments='#')
 
-   #             # Find timestamp of Ref for the legend
-   #             with open(params['refDir']+filename,'r') as rf:
-   #                 tLine = [line for i, line in enumerate(rf) if i==1]
+                # Find timestamp of Ref for the legend
+                with open(params['refDir']+filename,'r') as rf:
+                    tLine = [line for i, line in enumerate(rf) if i==1]
 
-   #             if params['measType'] == 'Spectrum':
-   #                 specPlot(refArray, nDisp, params,
-   #                          tLine[0][tLine[0].find(':')+2:-1])
-   #             elif params['measType'] == 'TF':
-   #                 tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1])
+                if params['measType'] == 'Spectrum':
+                    specPlot(refArray, nDisp, params,
+                             tLine[0][tLine[0].find(':')+2:-1])
 
-   #     if params['measType'] == 'Spectrum':
-   #         specPlot(dataArray, nDisp, params,params['timeStamp'])
-   #     elif params['measType'] == 'TF':
-   #         tfPlot(dataArray,params,params['timeStamp'])
+        if params['measType'] == 'Spectrum':
+            specPlot(np.hstack((np.resize(freq,(len(freq),1)),data)), nDisp, params,params['timeStamp'])
 
-   #     plt.gcf().set_size_inches(11,8)
-   #     if params['saveFig'] is True:
-   #         plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
-   #     plt.show()    
+        plt.gcf().set_size_inches(11,8)
+        if params['saveFig'] is True:
+            plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
+        plt.show()    
 
 
 if __name__ == "__main__":
@@ -214,9 +212,9 @@ if __name__ == "__main__":
     if args.template:
         import shutil
         print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
-        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPSR785template.yml')
+        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPAG4395template.yml')
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
-        shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
+        shutil.copyfile(TFtemplateFile, os.getcwd()+'/NWAG4395template.yml')
         print 'Done!'
 
     else:

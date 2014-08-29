@@ -7,6 +7,11 @@ import time
 #import netgpib
 import numpy as np
 
+def writeHeader(dataFile, timeStamp):
+    dataFile.write('# AG4395A Measurement\n')
+    dataFile.write('# Timestamp: ' + timeStamp+'\n') 
+
+
 def setParameters(gpibObj, params): 
     # Spectrum only so far!
     gpibObj.command('PRES')
@@ -66,14 +71,27 @@ def measure(gpibObj, params):
     tim = gpibObj.query("SWET?")
     tot_time = float(tim)*(params['averages']+1)
 
-    for disp in range(nDisp):
-        gpibObj.command('CHAN'+str(disp+1))
+    if nDisp == 2:
+        tot_time = tot_time*2
+        gpibObj.command('CHAN1')
         time.sleep(0.1)
         gpibObj.command('AVER ON')
         time.sleep(0.1)
-        gpibObj.command("AVERREST") #Start measurement
+        gpibObj.command('AVERREST') #Start measurement
+        time.sleep(0.1)
+        gpibObj.command('CONT')
+        time.sleep(0.1)
+        gpibObj.command('CHAN2')
+        time.sleep(0.1)
 
-    print('Running for '+str(tot_time)+' seconds...')
+    gpibObj.command('AVER ON')
+    time.sleep(0.1)
+    gpibObj.command('AVERREST') #Start measurement
+    time.sleep(0.1)
+    gpibObj.command('CONT')
+    time.sleep(1)
+
+    print('Running for '+str(np.round(tot_time,decimals=1))+' seconds...')
     # Is this really the best way? Can't I query the number of averages, like sr785?
     # Yes! Read page 5-14 in programming manual, need to figure out how to implement.
     time.sleep(tot_time)
