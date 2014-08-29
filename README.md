@@ -19,3 +19,8 @@ Python package dependencies:
 - yaml 
 
 Older scripts for the SR785 are included in the "oldScripts" directory. 
+
+AGmeasure (In progress)
+-----------------------
+This program is analagous to SRmeasure, but for the agilent AG4395 network analyzer. 
+Currently, only spectrum analyzer mode is supported. The program has the capability of splitting up the measurement logarithmically, to have reasonable resolution when taking spectra over a large bandwidth. 
