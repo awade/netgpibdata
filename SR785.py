@@ -641,13 +641,14 @@ def setParameters(gpibObj,params):
 
 def measure(gpibObj, measType):
     #Start measurement
-    print 'Starting ' + measType + ' measurement...' 
     sys.stdout.flush()
     gpibObj.command('STRT') #Start
     #Wait for the measurement to end
     measuring = True
     
     if measType == 'Spectrum':
+        print 'Starting ' + measType + ' measurement...' 
+        time.sleep(0.1)
         avg=0
         print 'Averaging completed:'
         avgStatus=termstatus.statusTxt("0")
@@ -663,6 +664,8 @@ def measure(gpibObj, measType):
         gpibObj.command('ASCL1') #Auto scale
 
     elif measType =='TF':
+        print 'Starting ' + measType + ' measurement...' 
+        time.sleep(1)
         percentage=0
         progressInfo=termstatus.statusTxt('0%')
         numPoints=int(gpibObj.query('SNPS?0')) #Number of points
@@ -672,8 +675,9 @@ def measure(gpibObj, measType):
             #measuring = not (int(gpibObj.query('DSPS?4')) 
             #                 or int(gpibObj.query('DSPS?0')))
             measuring = not int(gpibObj.query('DSPS?4'))
+            time.sleep(0.1)
             a=int(gpibObj.query('SSFR?'))
-            percentage=int(round(100*a/numPoints))
+            percentage=int(round(100*a/(numPoints)))
             progressInfo.update(str(percentage)+'%')
             time.sleep(0.5)
         progressInfo.end('100%')

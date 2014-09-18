@@ -24,17 +24,16 @@ def readParams(paramFile):
     return(params)
 
 
-def specPlot(dataArray, nDisp, params, legLabel):
+def specPlot(dataArray, nDisp, params, legLabel, axlist):
     if nDisp == 2:
         ## Switch this out if your matplotlib is too old to have plt.subplots 
         #f =plt.gcf()
         #axlist=[plt.subplot(211), plt.subplot(212)]
-        f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
 
-        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel)
-        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel)
-        axlist[0].set_title('Channel 1')
-        axlist[1].set_title('Channel 2')
+        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel+" (Ch1)")
+        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel+" (Ch2)")
+        #axlist[0].set_title('Channel 1')
+        #axlist[1].set_title('Channel 2')
         axlist[0].set_xscale('log')
         axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist[0].set_yscale('log')
@@ -42,30 +41,29 @@ def specPlot(dataArray, nDisp, params, legLabel):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        f.suptitle('SR785 Spectrum Measurement - ' + 
+        axlist[0].title('SR785 Spectrum Measurement - ' + 
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
         axlist[0].grid('on', which='both')
         axlist[1].grid('on', which='both')
         axlist[0].legend()
-        axlist[0].get_legend().get_frame().set_alpha(.5)
+        axlist[0].get_legend().get_frame().set_alpha(.7)
     else:
-        ax=plt.subplot(111)
-        ax.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
-        ax.set_xscale('log')
-        ax.set_xlabel('Freq. (Hz)')
-        ax.set_ylabel('Magnitude ('+params['dataMode']+')')
-        ax.set_yscale('log')
-        f.suptitle('SR785 Spectrum Measurement - ' + 
+        axlist.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        axlist.set_xscale('log')
+        axlist.set_xlabel('Freq. (Hz)')
+        axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
+        axlist.set_yscale('log')
+        axlist.set_title('SR785 Spectrum Measurement - ' + 
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
-        ax.axis('tight')
-        ax.grid('on', which='both')
-        ax.legend()
-        ax.get_legend().get_frame().set_alpha(.5)
+        axlist.axis('tight')
+        axlist.grid('on', which='both')
+        axlist.legend()
+        axlist.get_legend().get_frame().set_alpha(.7)
 
 
-def tfPlot(dataArray,params, legLabel):
+def tfPlot(dataArray,params, legLabel, axlist):
     format = params['dataMode']
     if format == 'ReIm':
         Carray = dataArray[:,1] + 1j*dataArray[:,2]
@@ -77,7 +75,6 @@ def tfPlot(dataArray,params, legLabel):
     ## Switch this out if your matplotlib is too old to have plt.subplots 
     #f =plt.gcf()
     #axlist=[plt.subplot(211), plt.subplot(212)]
-    f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
     axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
     axlist[1].plot(dataArray[:,0],np.angle(Carray, deg=True),label=legLabel)
 
@@ -88,7 +85,7 @@ def tfPlot(dataArray,params, legLabel):
     axlist[1].set_xlabel('Freq. (Hz)')
     axlist[1].set_yscale('linear')
     axlist[1].set_ylabel('Phase (deg)')
-    f.suptitle('SR785 TF Measurement - ' + 
+    axlist[0].set_title('SR785 TF Measurement - ' + 
             time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
     axlist[0].axis('tight')
     axlist[1].axis('tight')
@@ -96,7 +93,7 @@ def tfPlot(dataArray,params, legLabel):
     axlist[0].grid('on', which='both')
     axlist[1].grid('on', which='both')
     axlist[1].legend()
-    axlist[1].get_legend().get_frame().set_alpha(.5)
+    axlist[1].get_legend().get_frame().set_alpha(.7)
     
 
 def main(paramFile=None):
@@ -170,6 +167,7 @@ def main(paramFile=None):
         dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
                                             np.array(data,dtype='float'))))
 
+        f, axlist = plt.subplots(nrows=nDisp, ncols=1, sharex=True)
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
             refFiles = [ rf for rf in os.listdir(params['refDir']) 
@@ -188,14 +186,14 @@ def main(paramFile=None):
 
                 if params['measType'] == 'Spectrum':
                     specPlot(refArray, nDisp, params,
-                             tLine[0][tLine[0].find(':')+2:-1])
+                             tLine[0][tLine[0].find(':')+2:-1], axlist)
                 elif params['measType'] == 'TF':
-                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1])
+                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1], axlist)
 
         if params['measType'] == 'Spectrum':
-            specPlot(dataArray, nDisp, params,params['timeStamp'])
+            specPlot(dataArray, nDisp, params,params['timeStamp'], axlist)
         elif params['measType'] == 'TF':
-            tfPlot(dataArray,params,params['timeStamp'])
+            tfPlot(dataArray,params,params['timeStamp'], axlist)
 
         plt.gcf().set_size_inches(11,8)
         if params['saveFig'] is True:
