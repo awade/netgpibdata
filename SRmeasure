@@ -145,19 +145,12 @@ def main(paramFile=None):
 
     with open(outDir + dataFileName,'w') as dataFile:
         SR785.writeHeader(dataFile, params['timeStamp'])
+
         if noParam is False: dataFile.write('# Paramter File: ' 
                                             + params['fileName']+'\n')
-        SR785.writeParams(gpibObj, dataFile)
-        print('Writing measurement data to file...')
 
-        #Write data vectors
-        for i in range(len(freq)):
-            if nDisp == 2:
-                dataFile.write(freq[i]+'    '+data[0][i]+
-                               '     '+data[1][i]+'\n')
-            else:
-                dataFile.write(freq[i]+'    '+data[0][i] + '\n')
-        dataFile.close()
+        SR785.writeParams(gpibObj, dataFile)
+        SR785.writeData(dataFile, freq, data)
 
     print "Done!"
     gpibObj.close()

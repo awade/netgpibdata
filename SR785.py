@@ -8,7 +8,99 @@ import time
 import netgpib
 import termstatus
 
-def downloadData(gpibObj, disp):
+####################
+# GPIB
+####################
+
+
+def connectGPIB(ipAddress,gpibAddress):
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+' ...'),
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
+    print('done.')
+    #Set output to GPIB
+    gpibObj.command("OUTX0")
+    # Print IDN
+    print "Instrument ID: ",
+    idnString=gpibObj.query("*IDN?")
+    print idnString.splitlines()[-1]
+    time.sleep(0.1)
+    return(gpibObj)
+
+
+####################
+# Settings helpers
+####################
+
+def reset(gpibObj):
+    # Call reset command, manual states it takes 12 sec to finish
+    print('Resetting SR785...')
+    gpibObj.command("*RST")
+    time.sleep(12)
+    print('Done!')
+
+
+def psdOff(gpibObj):
+    # Ensure that PSD units are off, since it can get stuck in swept sine mode
+    while gpibObj.query('PSDU?0')[0] =='1' or gpibObj.query('PSDU?1')[0] == '1':
+        mGrp = gpibObj.query('MGRP?0')
+        meas0 = gpibObj.query('MEAS?0')
+        meas1 = gpibObj.query('MEAS?1')
+        gpibObj.command('MGRP2,0')
+        gpibObj.command('MEAS0,0')
+        gpibObj.command('MEAS0,1')
+        gpibObj.command('PSDU0,0')
+        gpibObj.command('PSDU1,0')
+        time.sleep(.5)         
+        gpibObj.command('MGRP2,'+mGrp.split('\n')[0])
+        gpibObj.command('MEAS0,'+meas0.split('\n')[0])
+        gpibObj.command('MEAS1,'+meas1.split('\n')[0])
+
+
+####################
+# Compatibility with old netgpibdata script
+####################
+
+
+def getdata(gpibObj, dataFile, paramFile):
+    # For compatibility with old netgpibdata
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    gpibObj.command("OUTX0")
+    time.sleep(0.1)
+    nDisp=int(gpibObj.query("DFMT?",100))
+    if nDisp == 3:
+       nDisp=1        
+    nDisp = nDisp + 1
+    (freq,data)=download(gpibObj, nDisp)
+    writeHeader(dataFile, timeStamp)
+    writeData(dataFile, freq, data)
+
+
+def getparam(gpibObj, fileRoot, dataFile, paramFile):
+    # For compatibility with old netgpibdata
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    writeHeader(paramFile, timeStamp)
+    writeParams(gpibObj, paramFile)
+
+
+####################
+# Fetching data
+####################
+
+
+def download(gpibObj, nDisp):
+    data=list()
+    freq=list()
+
+    for disp in range(nDisp):
+        print('Downloading data from display #'+str(disp))
+        (f,d)=downloadDisplay(gpibObj, disp)        
+        freq.append(f)
+        data.append(d)
+
+    return(freq, data)
+
+
+def downloadDisplay(gpibObj, disp):
     #Get the number of points on the Display 
     numPoint = int(gpibObj.query('DSPN?'+str(disp),100))
     freq=[]
@@ -16,6 +108,7 @@ def downloadData(gpibObj, disp):
     accomplished=0
     print 'Reading data'
     progressInfo=termstatus.statusTxt('0%')
+
     for bin in range(numPoint): #Loop for frequency bins
         percent = int(floor(100*bin/numPoint))
 
@@ -36,50 +129,94 @@ def downloadData(gpibObj, disp):
     return (freq,data)
 
 
-def download(gpibObj, nDisp):
-    data=list()
-    for disp in range(nDisp):
-        print('Downloading data from display #'+str(disp))
-        (f,d)=downloadData(gpibObj, disp)        
-        data.append(d)
-    freq=f
-    return(freq, data)
+####################
+# Output file writing
+####################
 
-def getdata(gpibObj, dataFile, paramFile):
-    # For compatibility with old netgpibdata
-    gpibObj.command("OUTX0")
-    time.sleep(0.1)
-    nDisp=int(gpibObj.query("DFMT?",100))
-    if nDisp == 3:
-       nDisp=1        
-    nDisp = nDisp + 1
 
-    (freq,data)=download(gpibObj, nDisp)
+def writeHeader(dataFile, timeStamp):
+    dataFile.write('# SR785 Measurement\n')
+    dataFile.write('# Timestamp: ' + timeStamp+'\n') 
 
-    #Check the measurement group
-    isSpectra=not int(gpibObj.query('MGRP?'+str(int(nDisp-1)),100)) #True if it is FFT measurement
+
+def writeData(dataFile,freq,data):
+    print('Writing measurement data to file...')
+    #Write data vectors
+    if len(freq) > 1: #Dual chan 
+
+        if freq[0] == freq[1]: #Shared Freq axis
+            for i in range(len(freq[0])):
+                dataFile.write(freq[0][i] + '    ' + data[0][i] 
+                                + '    ' + data[1][i] + '\n')
+
+        else: #Unequal axes! Kind of awkward to output nicely
+            print('Unequal Frequency Axes, stacking output')
+            for i in range(len(freq[0])):
+                dataFile.write(freq[0][i] + '    ' + data[0][i] + '\n')
+            # Print unit line?
+            dataFile.write('# Channel 2 Data\n')
+            for i in range(len(freq[1])):
+                dataFile.write(freq[1][i] + '    ' + data[1][i] + '\n')
+
+    else: #Single display
+        for i in range(len(freq[0])):
+            dataFile.write(freq[0][i]+'    '+data[0][i]+'\n')
+
+
+####################
+# Run new measurement
+####################
+
+
+def measure(gpibObj, measType):
+    #Start measurement
+    sys.stdout.flush()
+    gpibObj.command('STRT') #Start
+    #Wait for the measurement to end
+    measuring = True
     
-    if isSpectra:  #If FFT group
-        for disp in range(nDisp):
-            dataFile.write('#Display #'+str(disp+1)+' length= '+str(len(freq[disp]))+'\n')
+    if measType == 'Spectrum':
+        print 'Starting ' + measType + ' measurement...' 
+        time.sleep(0.1)
+        avg=0
+        print 'Averaging completed:'
+        avgStatus=termstatus.statusTxt("0")
+        while measuring:
+            measuring = not int(gpibObj.query('DSPS?1'))
+            avg=int(gpibObj.query("NAVG?0"))
+            avgStatus.update(str(avg))
+            time.sleep(0.3)
 
-            for j in range(len(freq)):
-                dataFile.write(freq[j])
-                dataFile.write(' '+data[disp][j]+'\n')
-        
-    else:  #Else
-    #Write to the data file
-        print('Writing data into the data file ...\n')
-    
-        for i in range(len(freq)):
-            dataFile.write(freq[i])
-            for disp in range(nDisp):
-                dataFile.write(' '+data[disp][i])
-            dataFile.write('\n')
+        a=int(gpibObj.query("NAVG?0"))
+        avgStatus.end(str(a))
+        gpibObj.command('ASCL0') #Auto scale
+        gpibObj.command('ASCL1') #Auto scale
 
-def getparam(gpibObj, fileRoot, dataFile, paramFile):
-    # For compatibility with old netgpibdata
-    writeParams(gpibObj, paramFile)
+    elif measType =='TF':
+        print 'Starting ' + measType + ' measurement...' 
+        time.sleep(1)
+        percentage=0
+        progressInfo=termstatus.statusTxt('0%')
+        numPoints=int(gpibObj.query('SNPS?0')) #Number of points
+        while measuring:
+            #Get status 
+            ## Manual says we should check bit 0 as well...
+            #measuring = not (int(gpibObj.query('DSPS?4')) 
+            #                 or int(gpibObj.query('DSPS?0')))
+            measuring = not int(gpibObj.query('DSPS?4'))
+            time.sleep(0.1)
+            a=int(gpibObj.query('SSFR?'))
+            percentage=int(round(100*a/(numPoints)))
+            progressInfo.update(str(percentage)+'%')
+            time.sleep(0.5)
+        progressInfo.end('100%')
+
+    print('Done!')
+
+
+####################
+# Saving and setting measurement parameters
+####################
 
 
 def writeParams(gpibObj, paramFile):
@@ -413,47 +550,6 @@ def writeParams(gpibObj, paramFile):
     paramFile.write(']\n')
 
 
-def reset(gpibObj):
-    # Call reset command, manual states it takes 12 sec to finish
-    print('Resetting SR785...')
-    gpibObj.command("*RST")
-    time.sleep(12)
-    print('Done!')
-
-
-def psdOff(gpibObj):
-    # Ensure that PSD units are off, since it can get stuck in swept sine mode
-    while gpibObj.query('PSDU?0')[0] =='1' or gpibObj.query('PSDU?1')[0] == '1':
-        mGrp = gpibObj.query('MGRP?0')
-        meas0 = gpibObj.query('MEAS?0')
-        meas1 = gpibObj.query('MEAS?1')
-        gpibObj.command('MGRP2,0')
-        gpibObj.command('MEAS0,0')
-        gpibObj.command('MEAS0,1')
-        gpibObj.command('PSDU0,0')
-        gpibObj.command('PSDU1,0')
-        time.sleep(.5)         
-        gpibObj.command('MGRP2,'+mGrp.split('\n')[0])
-        gpibObj.command('MEAS0,'+meas0.split('\n')[0])
-        gpibObj.command('MEAS1,'+meas1.split('\n')[0])
-
-
-def connectGPIB(ipAddress,gpibAddress):
-    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+' ...'),
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
-    print('done.')
-
-    #Set output to GPIB
-    gpibObj.command("OUTX0")
-
-    # Print IDN
-    print "Instrument ID: ",
-    idnString=gpibObj.query("*IDN?")
-    print idnString.splitlines()[-1]
-    time.sleep(0.1)
-    return(gpibObj)
-
-
 def setParameters(gpibObj,params):
     # Read dictionary of settings to set up the instrument
     print('Setting up parameters for the measurement...')
@@ -673,53 +769,3 @@ def setParameters(gpibObj,params):
             gpibObj.command('UNPH1,0') # Phase Unit deg.
     else:
         raise ValueError('Wrong measurement type entered in parameter file!')
-
-
-def measure(gpibObj, measType):
-    #Start measurement
-    sys.stdout.flush()
-    gpibObj.command('STRT') #Start
-    #Wait for the measurement to end
-    measuring = True
-    
-    if measType == 'Spectrum':
-        print 'Starting ' + measType + ' measurement...' 
-        time.sleep(0.1)
-        avg=0
-        print 'Averaging completed:'
-        avgStatus=termstatus.statusTxt("0")
-        while measuring:
-            measuring = not int(gpibObj.query('DSPS?1'))
-            avg=int(gpibObj.query("NAVG?0"))
-            avgStatus.update(str(avg))
-            time.sleep(0.3)
-
-        a=int(gpibObj.query("NAVG?0"))
-        avgStatus.end(str(a))
-        gpibObj.command('ASCL0') #Auto scale
-        gpibObj.command('ASCL1') #Auto scale
-
-    elif measType =='TF':
-        print 'Starting ' + measType + ' measurement...' 
-        time.sleep(1)
-        percentage=0
-        progressInfo=termstatus.statusTxt('0%')
-        numPoints=int(gpibObj.query('SNPS?0')) #Number of points
-        while measuring:
-            #Get status 
-            ## Manual says we should check bit 0 as well...
-            #measuring = not (int(gpibObj.query('DSPS?4')) 
-            #                 or int(gpibObj.query('DSPS?0')))
-            measuring = not int(gpibObj.query('DSPS?4'))
-            time.sleep(0.1)
-            a=int(gpibObj.query('SSFR?'))
-            percentage=int(round(100*a/(numPoints)))
-            progressInfo.update(str(percentage)+'%')
-            time.sleep(0.5)
-        progressInfo.end('100%')
-    print('Done!')
-
-
-def writeHeader(dataFile, timeStamp):
-    dataFile.write('# SR785 Measurement\n')
-    dataFile.write('# Timestamp: ' + timeStamp+'\n') 
