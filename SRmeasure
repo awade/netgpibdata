@@ -96,7 +96,8 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].get_legend().get_frame().set_alpha(.7)
     
 
-def main(paramFile=None, ipAddress=None, gpibAddress=None):
+def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None, 
+         plotRefs=None):
     print('----------------------------------')
     if paramFile is None:
         # Set sensible defaults for downloading live data
@@ -113,9 +114,13 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None):
         params['fileName']=paramFile
 
     if ipAddress is not None: 
-        params['ipAddress'] = ipAddress 
+        params['ipAddress'] = ipAddress
     if gpibAddress is not None:
-        params['gpibAddress'] = gpibAddress 
+        params['gpibAddress'] = gpibAddress
+    if plotResult is not None:
+        params['plotResult'] = plotResult
+    if plotRefs is not None:
+        params['plotRefs'] = plotRefs
 
     gpibObj = SR785.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
@@ -232,10 +237,19 @@ if __name__ == "__main__":
                        'measurement on an SR785. IP and GPIB address are '\
                        'required.', action='store_true')
 
+    parser.add_argument('--plot', help='Plot result of measurement. Overrides'\
+                        ' parameter file.', action='store_true',default = None)
+
+    parser.add_argument('--plotRefs', help='Plot reference traces. Overrides'\
+                        ' parameter file. Reads files that have the same'\
+                        ' filename stem as references.',action='store_true', 
+                        default = None)
+
     args = parser.parse_args()
 
     if args.paramFile is not None:
-        main(args.paramFile, args.ipaddress, args.gpibaddress)
+        main(args.paramFile, args.ipaddress, args.gpibaddress, args.plot,
+             args.plotRefs)
 
     elif args.template:
         import shutil
@@ -249,7 +263,7 @@ if __name__ == "__main__":
         parser.error('Must specify IP and GPIB addresses!\n')
 
     if args.getdata:
-        main(None, args.ipaddress, args.gpibaddress)
+        main(None, args.ipaddress, args.gpibaddress, args.plot, args.plotRefs)
 
     if args.reset:
         gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
