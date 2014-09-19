@@ -119,6 +119,7 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None,
         params['gpibAddress'] = gpibAddress
     if plotResult is not None:
         params['plotResult'] = plotResult
+        params['saveFig'] = True
     if plotRefs is not None:
         params['plotRefs'] = plotRefs
 
