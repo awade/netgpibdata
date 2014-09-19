@@ -136,6 +136,15 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None,
     if noParam is False:
         SR785.setParameters(gpibObj,params)
         SR785.measure(gpibObj,params['measType'])
+    else: # What kind of measurement are we doing?
+        active = int(gpibObj.query('ACTD?')[0])
+        measGrp=int(gpibObj.query("MGRP?"+str(active)))
+        if measGrp==3:
+            params['measType']='TF'
+        elif measGrp==1:
+            params['measType']='Spectrum'
+        else:
+            params['measType']='Other'
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
