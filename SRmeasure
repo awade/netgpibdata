@@ -96,8 +96,8 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].get_legend().get_frame().set_alpha(.7)
     
 
-def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None, 
-         plotRefs=None):
+def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None, 
+         plotResult=None, plotRefs=None):
     print('----------------------------------')
     if paramFile is None:
         # Set sensible defaults for downloading live data
@@ -113,6 +113,11 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None,
         params=readParams(paramFile)
         params['fileName']=paramFile
 
+    fileExt='.txt'
+    if filename is not None:
+        params['nameRoot'] = filename.split('.')[0]
+        if '.' in filename:
+            fileExt = ''.join(filename.split('.')[1:])
     if ipAddress is not None: 
         params['ipAddress'] = ipAddress
     if gpibAddress is not None:
@@ -131,7 +136,7 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None,
     fileRoot = (params['nameRoot'] + '_' + 
                 time.strftime('%d-%m-%Y', time.localtime()) + 
                 time.strftime('_%H%M%S', time.localtime()))
-    dataFileName = fileRoot+'.txt'
+    dataFileName = fileRoot+fileExt
     outDir = params['saveDir'];
 
     # If new measurement is requested, do it!
@@ -233,6 +238,9 @@ if __name__ == "__main__":
     parser.add_argument('-a', '--gpibaddress',  help='GPIB address, typically'\
                         '10. Overrides parameter file.', default = None)
 
+    parser.add_argument('-f', '--filename',  help='Stem of output filename.'\
+                        'Overrides parameter file.', default = None)
+
     group.add_argument('--template', help='Copy template parameter files to'\
                        ' current dir; no measurement is made.', 
                        action='store_true')
@@ -259,8 +267,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.paramFile is not None:
-        main(args.paramFile, args.ipaddress, args.gpibaddress, args.plot,
-             args.plotRefs)
+        main(args.paramFile, args.filename, args.ipaddress, args.gpibaddress,
+             args.plot, args.plotRefs)
 
     elif args.template:
         import shutil
@@ -274,7 +282,8 @@ if __name__ == "__main__":
         parser.error('Must specify IP and GPIB addresses!\n')
 
     if args.getdata:
-        main(None, args.ipaddress, args.gpibaddress, args.plot, args.plotRefs)
+        main(None, args.filename, args.ipaddress, args.gpibaddress,
+             args.plot, args.plotRefs)
 
     if args.reset:
         gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
