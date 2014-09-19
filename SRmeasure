@@ -3,7 +3,7 @@
 # Eric Quintero - 2014
 
 # Standard library imports
-import os, time
+import os, sys, time
 import argparse
 
 # Neccesary external libraries
@@ -96,14 +96,12 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].get_legend().get_frame().set_alpha(.7)
     
 
-def main(paramFile=None):
+def main(paramFile=None, ipAddress=None, gpibAddress=None):
     print('----------------------------------')
     if paramFile is None:
         # Set sensible defaults for downloading live data
         noParam = True
         params={}
-        params['ipAddress'] = raw_input('Enter IP (hostname or raw): ')
-        params['gpibAddress'] = raw_input('Enter GPIB address (usually 10): ')
         params['nameRoot'] = 'SR785'
         params['saveDir'] = os.getcwd()+'/'
         params['plotRefs'] = False
@@ -113,6 +111,11 @@ def main(paramFile=None):
         print('Reading parameters from '+paramFile)
         params=readParams(paramFile)
         params['fileName']=paramFile
+
+    if ipAddress is not None: 
+        params['ipAddress'] = ipAddress 
+    if gpibAddress is not None:
+        params['gpibAddress'] = gpibAddress 
 
     gpibObj = SR785.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
@@ -128,16 +131,10 @@ def main(paramFile=None):
     if noParam is False:
         SR785.setParameters(gpibObj,params)
         SR785.measure(gpibObj,params['measType'])
-    
-    # Find out number of displays on the screen
-    nDisp=int(gpibObj.query("DFMT?"))
-    if nDisp == 3:
-        nDisp=1
-    nDisp = nDisp + 1
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
-    (freq, data) = SR785.download(gpibObj, nDisp)
+    (freq, data) = SR785.download(gpibObj)
 
     # Done measuring! Just output file writing and plotting below
     print('Saving files to '+outDir)
@@ -160,7 +157,7 @@ def main(paramFile=None):
         dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
                                             np.array(data,dtype='float'))))
 
-        f, axlist = plt.subplots(nrows=nDisp, ncols=1, sharex=True)
+        f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
             refFiles = [ rf for rf in os.listdir(params['refDir']) 
@@ -178,13 +175,13 @@ def main(paramFile=None):
                     tLine = [line for i, line in enumerate(rf) if i==1]
 
                 if params['measType'] == 'Spectrum':
-                    specPlot(refArray, nDisp, params,
+                    specPlot(refArray, len(data), params,
                              tLine[0][tLine[0].find(':')+2:-1], axlist)
                 elif params['measType'] == 'TF':
                     tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1], axlist)
 
         if params['measType'] == 'Spectrum':
-            specPlot(dataArray, nDisp, params,params['timeStamp'], axlist)
+            specPlot(dataArray, len(data), params,params['timeStamp'], axlist)
         elif params['measType'] == 'TF':
             tfPlot(dataArray,params,params['timeStamp'], axlist)
 
@@ -195,43 +192,71 @@ def main(paramFile=None):
 
 
 if __name__ == "__main__":
+
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
     SPtemplateFile = scriptPath + '/SPSR785template.yml'
     TFtemplateFile = scriptPath + '/TFSR785template.yml'
 
-    parser = argparse.ArgumentParser() 
-    parser.add_argument('paramFile', nargs='?',
-                        help = 'The Parameter file for the measurement. ' \
-                               'If not specified, downloads data from the '\
-                               'live display of the instrument.',
-                        default=None)
-    parser.add_argument('--template', help='Copy template parameter files to'\
-                                           ' current dir; no measurement is'\
-                                           ' made.',
-                        action='store_true')
-    parser.add_argument('--reset', help='Resets an SR785, IP and GPIB address'\
-                                        ' are required.',
-                        action='store_true')
+    class helpfulParser(argparse.ArgumentParser):
+        def error(self, message):
+            sys.stderr.write('error: %s\n' % message)
+            self.print_help()
+            sys.exit(2)
+
+    parser = helpfulParser()
+    group = parser.add_mutually_exclusive_group() 
+
+    group.add_argument('paramFile', nargs='?',
+                       help = 'The parameter file for the measurement.',
+                       default=None)
+
+    parser.add_argument('-i', '--ipaddress', help='IP address or hostname. '\
+                        'Overrides parameter file.', default = None)
+
+    parser.add_argument('-a', '--gpibaddress',  help='GPIB address, typically'\
+                        '10. Overrides parameter file.', default = None)
+
+    group.add_argument('--template', help='Copy template parameter files to'\
+                       ' current dir; no measurement is made.', 
+                       action='store_true')
+
+    group.add_argument('--reset', help='Resets an SR785, IP and GPIB address'\
+                       ' are required.', action='store_true')
+
+    group.add_argument('--getdata', help='Downloads live data from an SR785.'\
+                       ' IP and GPIB address are required.',
+                       action='store_true')
+
+    group.add_argument('--trigger', help='Trigger the currently configured '\
+                       'measurement on an SR785. IP and GPIB address are '\
+                       'required.', action='store_true')
 
     args = parser.parse_args()
 
-    if args.template:
+    if args.paramFile is not None:
+        main(args.paramFile, args.ipaddress, args.gpibaddress)
+
+    elif args.template:
         import shutil
         print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
         shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPSR785template.yml')
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
         shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
         print 'Done!'
+    
+    if args.ipaddress is None or args.gpibaddress is None:
+        parser.error('Must specify IP and GPIB addresses!\n')
 
-    elif args.reset:
-        ipAdd = raw_input('Enter IP (hostname or raw): ')
-        gpibAdd = raw_input('Enter GPIB address (usually 10): ')
-        gpibObj = SR785.connectGPIB(ipAdd, gpibAdd)
+    if args.getdata:
+        main(None, args.ipaddress, args.gpibaddress)
+
+    if args.reset:
+        gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
         SR785.reset(gpibObj)
+        gpibObj.close()
 
-    else:
-        if args.paramFile is None:
-            print 'No parameter file specified! '\
-                  'Will download from current display...'
-        main(args.paramFile)
+    elif args.trigger:
+        gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
+        gpibObj.command('STRT')
+        gpibObj.close()

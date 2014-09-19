@@ -66,11 +66,7 @@ def getdata(gpibObj, dataFile, paramFile):
     timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
     gpibObj.command("OUTX0")
     time.sleep(0.1)
-    nDisp=int(gpibObj.query("DFMT?",100))
-    if nDisp == 3:
-       nDisp=1        
-    nDisp = nDisp + 1
-    (freq,data)=download(gpibObj, nDisp)
+    (freq,data)=download(gpibObj)
     writeHeader(dataFile, timeStamp)
     writeData(dataFile, freq, data)
 
@@ -87,13 +83,19 @@ def getparam(gpibObj, fileRoot, dataFile, paramFile):
 ####################
 
 
-def download(gpibObj, nDisp):
+def download(gpibObj):
     data=list()
     freq=list()
-
-    for disp in range(nDisp):
-        print('Downloading data from display #'+str(disp))
-        (f,d)=downloadDisplay(gpibObj, disp)        
+    if gpibObj.query('DFMT?')[0] != 0: # Dual channel, or overlay
+        for disp in range(2):
+            print('Downloading data from display #'+str(disp))
+            (f,d)=downloadDisplay(gpibObj, disp)        
+            freq.append(f)
+            data.append(d)
+    else:
+        active = int(gpibObj.query('ACTD?')[0])
+        print('Downloading data from display #'+str(active))
+        (f,d)=downloadDisplay(gpibObj, active)        
         freq.append(f)
         data.append(d)
 
@@ -224,10 +226,10 @@ def writeParams(gpibObj, paramFile):
     print('Reading instrument parameters')
         
     #Get the display format
-    nDisp=int(gpibObj.query("DFMT?"))
-    if nDisp == 3:
-        nDisp=1
-    nDisp = nDisp + 1
+    if int(gpibObj.query("DFMT?")) != 0:
+        dispList = range(2)
+    else:
+        dispList = [int(gpibObj.query('ACTD?')[0])]
 
     #Get display parameters for each display
     measGrp=[]
@@ -237,7 +239,7 @@ def writeParams(gpibObj, paramFile):
 
     time.sleep(0.1)
 
-    for disp in range(nDisp):
+    for disp in dispList:
         i=int(gpibObj.query("MGRP?"+str(disp)))
         measGrp.append({0: 'FFT' , 
                          1: 'Correlation', 
@@ -501,19 +503,19 @@ def writeParams(gpibObj, paramFile):
 
     paramFile.write('#---------- Measurement Parameters ----------\n')
     paramFile.write('# Measurement Group: ')
-    for disp in range(nDisp):
+    for disp in dispList:
         paramFile.write(' "'+measGrp[disp]+'"')
     paramFile.write('\n')
     paramFile.write('# Measurements: ')
-    for disp in range(nDisp):
+    for disp in dispList:
         paramFile.write(' "'+measurement[disp]+'"')
     paramFile.write('\n')
     paramFile.write('# View: ')
-    for disp in range(nDisp):
+    for disp in dispList:
         paramFile.write(' "'+view[disp]+'"')
     paramFile.write('\n')
     paramFile.write('# Unit: ')
-    for disp in range(nDisp):
+    for disp in dispList:
         paramFile.write(' "'+unit[disp]+'"')
     paramFile.write('\n')
     
@@ -545,7 +547,7 @@ def writeParams(gpibObj, paramFile):
 
     paramFile.write('#---------- Measurement Data ----------\n')
     paramFile.write('# [Freq(Hz) ')
-    for disp in range(nDisp):
+    for disp in dispList:
         paramFile.write('Display '+str(disp)+'('+unit[disp]+') ')
     paramFile.write(']\n')
 
