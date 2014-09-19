@@ -41,7 +41,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist[0].title('SR785 Spectrum Measurement - ' + 
+        axlist[0].set_title('SR785 Spectrum Measurement - ' + 
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
@@ -148,10 +148,16 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         measGrp=int(gpibObj.query("MGRP?"+str(active)))
         if measGrp==3:
             params['measType']='TF'
-        elif measGrp==1:
+        elif measGrp==0:
             params['measType']='Spectrum'
         else:
             params['measType']='Other'
+            if params['plotResult'] is True:
+                print "Not measuring TF or Spectrum, plotting will not work."
+        #Units
+        result=gpibObj.query('UNIT?'+str(active))
+        result=result[:-1]  # Chop a new line character
+        params['dataMode']=result.replace('\xfb','rt')
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
@@ -175,7 +181,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
 
     if params['plotResult'] is True:
         print 'Plotting!'
-        dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
+        dataArray = np.transpose(np.vstack((np.array(freq[0],dtype='float'),
                                             np.array(data,dtype='float'))))
 
         f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
@@ -189,7 +195,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
             # Plot each reference in order
             refFiles.sort()
             for filename in refFiles:
-                refArray = np.loadtxt(params['refDir']+filename,comments='#')
+                refArray = np.loadtxt(params['refDir']+filename)
 
                 # Find timestamp of Ref for the legend
                 with open(params['refDir']+filename,'r') as rf:
@@ -206,9 +212,10 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         elif params['measType'] == 'TF':
             tfPlot(dataArray,params,params['timeStamp'], axlist)
 
-        plt.gcf().set_size_inches(11,8)
+        f.set_size_inches(11,8)
+        #f.canvas.draw()
         if params['saveFig'] is True:
-            plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
+            f.savefig(outDir+fileRoot+'.pdf',format='pdf')
         plt.show()    
 
 
