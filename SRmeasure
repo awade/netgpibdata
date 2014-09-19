@@ -122,6 +122,7 @@ def main(paramFile=None, ipAddress=None, gpibAddress=None, plotResult=None,
         params['saveFig'] = True
     if plotRefs is not None:
         params['plotRefs'] = plotRefs
+        params['refDir'] = os.getcwd()+'/'
 
     gpibObj = SR785.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
