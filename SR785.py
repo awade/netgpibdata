@@ -14,9 +14,9 @@ import termstatus
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+' ...'),
+    print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
     gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
-    print('done.')
+    print 'done.'
     #Set output to GPIB
     gpibObj.command("OUTX0")
     # Print IDN
@@ -178,28 +178,26 @@ def measure(gpibObj, measType):
     measuring = True
     
     if measType == 'Spectrum':
-        print 'Starting ' + measType + ' measurement...' 
+        print 'Starting ' + measType + ' measurement...'
         time.sleep(0.1)
-        avg=0
-        print 'Averaging completed:'
-        avgStatus=termstatus.statusTxt("0")
+        print '    Averages completed:',
+        avTot=int(gpibObj.query('FAVN?0'))
+        avgStatus=termstatus.progressBar(20,avTot)
         while measuring:
             measuring = not int(gpibObj.query('DSPS?1'))
             avg=int(gpibObj.query("NAVG?0"))
-            avgStatus.update(str(avg))
-            time.sleep(0.3)
+            avgStatus.update(avg)
+            time.sleep(0.5)
+        avgStatus.update(int(gpibObj.query("NAVG?0")))
 
-        a=int(gpibObj.query("NAVG?0"))
-        avgStatus.end(str(a))
         gpibObj.command('ASCL0') #Auto scale
         gpibObj.command('ASCL1') #Auto scale
 
     elif measType =='TF':
         print 'Starting ' + measType + ' measurement...' 
         time.sleep(1)
-        percentage=0
-        progressInfo=termstatus.statusTxt('0%')
         numPoints=int(gpibObj.query('SNPS?0')) #Number of points
+        progressInfo=termstatus.progressBar(20,numPoints)
         while measuring:
             #Get status 
             ## Manual says we should check bit 0 as well...
@@ -207,13 +205,9 @@ def measure(gpibObj, measType):
             #                 or int(gpibObj.query('DSPS?0')))
             measuring = not int(gpibObj.query('DSPS?4'))
             time.sleep(0.1)
-            a=int(gpibObj.query('SSFR?'))
-            percentage=int(round(100*a/(numPoints)))
-            progressInfo.update(str(percentage)+'%')
-            time.sleep(0.5)
-        progressInfo.end('100%')
-
-    print('Done!')
+            progressInfo.update(int(gpibObj.query('SSFR?')))
+            time.sleep(0.4)
+        progressInfo.end()
 
 
 ####################
@@ -554,7 +548,7 @@ def writeParams(gpibObj, paramFile):
 
 def setParameters(gpibObj,params):
     # Read dictionary of settings to set up the instrument
-    print('Setting up parameters for the measurement...')
+    print 'Setting up parameters for the measurement...'
     
     if params['measType'] == 'Spectrum':
         if params['numOfPoints'] <= 100:

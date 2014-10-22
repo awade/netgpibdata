@@ -98,7 +98,6 @@ def tfPlot(dataArray,params, legLabel, axlist):
 
 def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None, 
          plotResult=None, plotRefs=None):
-    print('----------------------------------')
     if paramFile is None:
         # Set sensible defaults for downloading live data
         noParam = True
@@ -141,8 +140,10 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
 
     # If new measurement is requested, do it!
     if noParam is False:
+        print 'Executing measurement specified in '+paramFile
         SR785.setParameters(gpibObj,params)
         SR785.measure(gpibObj,params['measType'])
+
     else: # What kind of measurement are we doing?
         active = int(gpibObj.query('ACTD?')[0])
         measGrp=int(gpibObj.query("MGRP?"+str(active)))
@@ -285,14 +286,14 @@ if __name__ == "__main__":
         shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
         print 'Done!'
     
-    if args.ipaddress is None or args.gpibaddress is None:
+    elif args.ipaddress is None or args.gpibaddress is None:
         parser.error('Must specify IP and GPIB addresses!\n')
 
-    if args.getdata:
+    elif args.getdata:
         main(None, args.filename, args.ipaddress, args.gpibaddress,
              args.plot, args.plotRefs)
 
-    if args.reset:
+    elif args.reset:
         gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
         SR785.reset(gpibObj)
         gpibObj.close()
