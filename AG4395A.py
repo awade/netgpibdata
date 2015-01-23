@@ -97,7 +97,7 @@ def measure(gpibObj, params):
     time.sleep(tot_time)
     print('Done!')
 
-def downloadData(gpibObj, params):
+def downloadData(gpibObj, params=None,quiet=True):
     # Put the analyzer on hold
     gpibObj.command('HOLD')
     time.sleep(0.1)
@@ -116,8 +116,8 @@ def downloadData(gpibObj, params):
         # In this mode, the data format is real,imag for each frequency point
         raise ValueError('I cannot do TFs yet!')
     else: # Spectrum mode!
-
-        print('Reading frequency points...')            
+        if quiet is False:
+            print('Reading frequency points...')            
         freqList = gpibObj.query('OUTPSWPRM?',1024)
         freqs = np.array(map(float,re.findall(r'[-+.E0-9]+', freqList)))
 
@@ -127,16 +127,17 @@ def downloadData(gpibObj, params):
             for ii in range(2):
                 gpibObj.command('CHAN'+str(ii+1))
                 time.sleep(0.5)
-                print('Reading data from channel '+str(ii+1))
+                if quiet is False:
+                    print('Reading data from channel '+str(ii+1))
                 dataStrings = gpibObj.query('OUTPDTRC?',1024)
                 dataList.append(np.array(map(float,re.findall(r'[-+.E0-9]+', dataStrings))))
         else:
-            print('Reading data from current display...')
+            if quiet is False:
+                print('Reading data from current display...')
             dataStrings = gpibObj.query('OUTPDTRC?',1024)
             dataList.append(np.array(map(float,re.findall(r'[-+.E0-9]+', dataStrings))))
         
         data = np.transpose(np.vstack(([column for column in dataList])))
-
     return(freqs,data)        
 
 
