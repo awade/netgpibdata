@@ -65,12 +65,15 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
 
 def tfPlot(dataArray,params, legLabel, axlist):
     format = params['dataMode']
-    if format == 'ReIm':
+    if format.lower() == 'reim':
         Carray = dataArray[:,1] + 1j*dataArray[:,2]
-    elif format =='dBPhDeg':
-        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
-    elif format =='MagPhDeg':
+    elif format.lower() =='magdeg':
         Carray = dataArray[:,1] * np.exp(1j*dataArray[:,2]/180.0*np.pi)
+    elif format.lower() =='dbdeg':
+        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
+    else: # FIXME, what do I do if it doesn't match anything?
+        print 'Problem detecting units for plot... assuming dB, Degrees'
+        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
 
     ## Switch this out if your matplotlib is too old to have plt.subplots 
     #f =plt.gcf()
@@ -149,16 +152,20 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         measGrp=int(gpibObj.query("MGRP?"+str(active)))
         if measGrp==3:
             params['measType']='TF'
+            result=gpibObj.query('UNIT?0')[:-1]+gpibObj.query('UNIT?1')[:-1]
+            params['dataMode']=result
         elif measGrp==0:
             params['measType']='Spectrum'
+            #Units
+            result=gpibObj.query('UNIT?'+str(active))
+            result=result[:-1]  # Chop a new line character
+            params['dataMode']=result.replace('\xfb','rt')
         else:
             params['measType']='Other'
             if params['plotResult'] is True:
-                print "Not measuring TF or Spectrum, plotting will not work."
-        #Units
-        result=gpibObj.query('UNIT?'+str(active))
-        result=result[:-1]  # Chop a new line character
-        params['dataMode']=result.replace('\xfb','rt')
+                print "Not measuring TF or Spectrum, will skip plotting"
+                params['plotResult']=False
+        print 'Detected Units: '+params['dataMode']
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
@@ -229,7 +236,7 @@ if __name__ == "__main__":
 
     class helpfulParser(argparse.ArgumentParser):
         def error(self, message):
-            sys.stderr.write('error: %s\n' % message)
+            sys.stderr.write('Error: %s\n' % message)
             self.print_help()
             sys.exit(2)
 

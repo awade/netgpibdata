@@ -27,7 +27,7 @@ intCycles:      5         # Integration cycles
 
 # Analyzer Settings
 arMode:         UpOnly    # Auto range mode: UpOnly or Tracking (default: UpOnly)
-dataMode:       dBPhDeg   # "dBPhDeg", "MagPhDeg" or "ReIm"
+dataMode:       dBDeg     # "dBDeg", "MagDeg" or "ReIm"
 dualchannel:    single    # "single"/"dual" chan mode
 avgMode:        RMS       # Averaging mode: "None, Vector, RMS or PeakHold"
 inputCoupling1: AC        # CH1 input coupling. "DC" or "AC"
