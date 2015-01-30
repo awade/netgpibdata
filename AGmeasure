@@ -1,17 +1,18 @@
 #!/usr/bin/env python
+# Master AG4395 measurement script
+# Eric Quintero - 2015
 
-
-import os
-import re
+# Standard library imports
+import os, sys, time
 import argparse
-import time
-import netgpib
-import AG4395A
+
+# Neccesary external libraries
+import yaml
 import numpy as np
 import matplotlib.pyplot as plt
-import yaml
 
-# FMTNOISE
+# Custom libaries
+import AG4395A as inst
 
 def readParams(paramFile):
     # Function to read a measurement parameter file in the YAML format
@@ -22,20 +23,15 @@ def readParams(paramFile):
     return(params)
 
 
-def specPlot(data, nDisp, params, legLabel):
-
-    if params['specType'] == 'Noise':
-        params['dataMode']='V/rtHz'
-    else:
-        params['dataMode']='dBm'
-
+def specPlot(dataArray, nDisp, params, legLabel, axlist):
+    plotTitle = params.get('plotTitle','AG4395A Spectrum')
     if nDisp == 2:
-        f, axlist = plt.subplots(nrows=2, ncols=1, sharex=True)
+        ## Switch this out if your matplotlib is too old to have plt.subplots 
+        #f =plt.gcf()
+        #axlist=[plt.subplot(211), plt.subplot(212)]
 
-        axlist[0].plot(data[:,0],data[:,1],label=legLabel)
-        axlist[1].plot(data[:,0],data[:,2],label=legLabel)
-        axlist[0].set_title('Channel 1')
-        axlist[1].set_title('Channel 2')
+        axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel+" (Ch1)")
+        axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel+" (Ch2)")
         axlist[0].set_xscale('log')
         axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist[0].set_yscale('log')
@@ -43,37 +39,71 @@ def specPlot(data, nDisp, params, legLabel):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        f.suptitle('AG4395 Spectrum Measurement - ' + 
-                params['timeStamp'])
+        axlist[0].set_title(plotTitle+' - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
         axlist[0].grid('on', which='both')
         axlist[1].grid('on', which='both')
         axlist[0].legend()
-        axlist[0].get_legend().get_frame().set_alpha(.5)
+        axlist[0].get_legend().get_frame().set_alpha(.7)
     else:
-        f,ax=plt.subplots()
-        ax.plot(data[:,0],data[:,1],label=legLabel)
-        ax.set_xscale('log')
-        ax.set_xlabel('Freq. (Hz)')
-        ax.set_ylabel('Magnitude ('+params['dataMode']+')')
-        ax.set_yscale('log')
-        f.suptitle('AG4395 Spectrum Measurement - ' + 
-                params['timeStamp'])
-        ax.axis('tight')
-        ax.grid('on', which='both')
-        ax.legend()
-        ax.get_legend().get_frame().set_alpha(.5)
+        axlist.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
+        axlist.set_xscale('log')
+        axlist.set_xlabel('Freq. (Hz)')
+        axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
+        axlist.set_yscale('log')
+        axlist.set_title(params['plotTitle']+' - ' + 
+                time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+        axlist.axis('tight')
+        axlist.grid('on', which='both')
+        axlist.legend()
+        axlist.get_legend().get_frame().set_alpha(.7)
 
 
-def main(paramFile=None):
-    print('----------------------------------')
+def tfPlot(dataArray,params, legLabel, axlist):
+    plotTitle = params.get('plotTitle','AG4395A TF')
+    format = params['dataMode']
+    if format.lower() == 'reim':
+        Carray = dataArray[:,1] + 1j*dataArray[:,2]
+    elif format.lower() =='magdeg':
+        Carray = dataArray[:,1] * np.exp(1j*dataArray[:,2]/180.0*np.pi)
+    elif format.lower() =='dbdeg':
+        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
+    else: # FIXME, what do I do if it doesn't match anything?
+        print 'Problem detecting units for plot... assuming dB, Degrees'
+        Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
+
+    ## Switch this out if your matplotlib is too old to have plt.subplots 
+    #f =plt.gcf()
+    #axlist=[plt.subplot(211), plt.subplot(212)]
+    axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
+    axlist[1].plot(dataArray[:,0],np.angle(Carray, deg=True),label=legLabel)
+
+    axlist[0].set_xscale('log')
+    axlist[0].set_ylabel('Magnitude (dB)')
+    axlist[0].set_yscale('linear')
+    axlist[1].set_xscale('log')
+    axlist[1].set_xlabel('Freq. (Hz)')
+    axlist[1].set_yscale('linear')
+    axlist[1].set_ylabel('Phase (deg)')
+    axlist[0].set_title(plotTitle+' - ' + 
+            time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
+    axlist[0].axis('tight')
+    axlist[1].axis('tight')
+    axlist[1].set_ylim((-180,180))
+    axlist[0].grid('on', which='both')
+    axlist[1].grid('on', which='both')
+    axlist[1].legend()
+    axlist[1].get_legend().get_frame().set_alpha(.7)
+
+
+def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None, 
+         plotResult=None, plotRefs=None):
     if paramFile is None:
         # Set sensible defaults for downloading live data
         noParam = True
         params={}
-        params['ipAddress'] = raw_input('Enter IP (hostname or raw): ')
-        params['gpibAddress'] = raw_input('Enter GPIB address (usually 10): ')
         params['nameRoot'] = 'AG4395A'
         params['saveDir'] = os.getcwd()+'/'
         params['plotRefs'] = False
@@ -86,81 +116,101 @@ def main(paramFile=None):
         params=readParams(paramFile)
         params['fileName']=paramFile
 
-    gpibObj = netgpib.netGPIB(params['ipAddress'], params['gpibAddress'],'\004',0)
+    fileExt='.txt'
+    if filename is not None:
+        params['nameRoot'] = filename.split('.')[0]
+        if '.' in filename:
+            fileExt = ''.join(filename.split('.')[1:])
+    if ipAddress is not None: 
+        params['ipAddress'] = ipAddress
+    if gpibAddress is not None:
+        params['gpibAddress'] = gpibAddress
+    if plotResult is not None:
+        params['plotResult'] = plotResult
+        params['saveFig'] = True
+    if plotRefs is not None:
+        params['plotRefs'] = plotRefs
+        params['refDir'] = os.getcwd()+'/'
+
+    gpibObj = inst.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
     # Set up output file names
     params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
     fileRoot = (params['nameRoot'] + '_' + 
                 time.strftime('%d-%m-%Y', time.localtime()) + 
                 time.strftime('_%H%M%S', time.localtime()))
-    dataFileName = fileRoot+'.txt'
+    dataFileName = fileRoot+fileExt
     outDir = params['saveDir'];
 
     # If new measurement is requested, do it!
     if noParam is False:
-        print 'Setting up measurement parameters...'
-        AG4395A.setParameters(gpibObj,params)
-    # Break up frequencies for psuedolog    
-    nseg = params['nSegment']
-    nDisp = int(gpibObj.query('DUAC?')[0])+1
+        print 'Executing measurement specified in '+paramFile
+        inst.setParameters(gpibObj,params)
+        inst.measure(gpibObj,params)
 
-    if noParam is False and int(nseg) > 1:
-        # We're doing a pseudo-log sweep!
-        # Need to find segment limits...
-        unitDict={'MHz':1e6,'kHz':1e3,'Hz':1.0,'mHz':1e-3}
-        f1m = re.search('([0-9]+)([A-Za-z]+)',params['startFreq'])
-        f2m = re.search('([0-9]+)([A-Za-z]+)',params['stopFreq'])
-        f1 = float(f1m.group(1))*unitDict[f1m.group(2)]
-        f2 = float(f2m.group(1))*unitDict[f2m.group(2)]
+    else: # What kind of measurement are we doing?
+        params['measType']={1: 'TF', 0: 'Spectrum'}[int(gpibObj.query('NA?'))]
+        nDisp = int(gpibObj.query('DUAC?')) +1
+        if nDisp == 1: 
+            chans=[int(gpibObj.query('CHAN2?'))+1]
+        else:
+            chans=[1,2]
 
-        fLims = np.round(np.logspace(np.log10(f1),np.log10(f2),nseg+1))
-        
-        # Loop over segments and measure
-        for ii in range(nseg):
-            if nDisp == 2:
-                gpibObj.command('CHAN1')
-                gpibObj.command('STAR '+str(fLims[ii]))
-                gpibObj.command('STOP '+str(fLims[ii+1]))
-                gpibObj.command('CHAN2')
-            gpibObj.command('STAR '+str(fLims[ii]))
-            gpibObj.command('STOP '+str(fLims[ii+1]))
-            time.sleep(2)
-            print 'Segment '+str(ii+1)+' of '+str(nseg)+'...'
-            AG4395A.measure(gpibObj,params)
-            (fi, di) = AG4395A.downloadData(gpibObj,params)
+        meas=[]
+        fmt=[]
+        for chan in chans:
+            gpibObj.command('CHAN'+str(chan))
+            # What measurement?
+            meas.append(gpibObj.query('MEAS?')[:-1])
+            fmt.append(gpibObj.query('FMT?')[:-1])
 
-            if ii==0:
-                freq=fi
-                data=di
+        if params['measType']=='Spectrum':
+            # Doesn't handle channels being in different units...
+            params['dataMode']=(gpibObj.query('SAUNIT?')[:-1])
+
+        elif params['measType']=='TF':
+            # What if channel 1 and 2 are swapped from the expected placement?
+            if fmt==['LOGM','PHAS']:
+                params['dataMode']='dbdeg'            
+            elif fmt==['LINM','PHAS']:
+                params['dataMode']='magdeg'            
+            elif fmt==['REAL','IMAG']:
+                params['dataMode']='reim'            
             else:
-                freq=np.concatenate((freq,fi))
-                data=np.concatenate((data,di))
-    else:
-        print 'foo'
-        AG4395A.measure(gpibObj,params)
-        (freq, data) = AG4395A.downloadData(gpibObj,params)
+                params['dataMode']=str(fmt)
+                if params['plotResult'] is True:
+                    print "No plot routined exists for data format, will skip plotting"
+                    params['plotResult']=False
+
+        print 'Detected Units: '+params['dataMode']
+
+
+    # Let the instrument catch up, then download the data
+    time.sleep(2)
+    (freq, data) = inst.download(gpibObj)
 
     # Done measuring! Just output file writing and plotting below
     print('Saving files to '+outDir)
     print('Measurement data will be written into '+outDir+dataFileName)
 
     with open(outDir + dataFileName,'w') as dataFile:
-        AG4395A.writeHeader(dataFile, params['timeStamp'])
+        inst.writeHeader(dataFile, params['timeStamp'])
+
         if noParam is False: dataFile.write('# Parameter File: ' 
                                             + params['fileName']+'\n')
-        #SR785.writeParams(gpibObj, dataFile)
-        print('Writing measurement data to file...')
 
-        #Write data vectors
-        for i in range(len(freq)):
-            dataFile.write(str(freq[i])+'    '
-                           + '    '.join([str(val) for val in data[i,:]])+'\n')
+        inst.writeParams(gpibObj, dataFile)
+        inst.writeData(dataFile, freq, data)
 
     print "Done!"
     gpibObj.close()
 
     if params['plotResult'] is True:
+        print 'Plotting!'
+        dataArray = np.transpose(np.vstack((np.array(freq[0],dtype='float'),
+                                            np.array(data,dtype='float'))))
 
+        f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
             refFiles = [ rf for rf in os.listdir(params['refDir']) 
@@ -171,55 +221,109 @@ def main(paramFile=None):
             # Plot each reference in order
             refFiles.sort()
             for filename in refFiles:
-                refArray = np.loadtxt(params['refDir']+filename,comments='#')
+                refArray = np.loadtxt(params['refDir']+filename)
 
                 # Find timestamp of Ref for the legend
                 with open(params['refDir']+filename,'r') as rf:
                     tLine = [line for i, line in enumerate(rf) if i==1]
 
                 if params['measType'] == 'Spectrum':
-                    specPlot(refArray, nDisp, params,
-                             tLine[0][tLine[0].find(':')+2:-1])
+                    specPlot(refArray, len(data), params,
+                             tLine[0][tLine[0].find(':')+2:-1], axlist)
+                elif params['measType'] == 'TF':
+                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1], axlist)
 
         if params['measType'] == 'Spectrum':
-            specPlot(np.hstack((np.resize(freq,(len(freq),1)),data)), nDisp, params,params['timeStamp'])
+            specPlot(dataArray, len(data), params,params['timeStamp'], axlist)
+        elif params['measType'] == 'TF':
+            tfPlot(dataArray,params,params['timeStamp'], axlist)
 
-        plt.gcf().set_size_inches(11,8)
+        f.set_size_inches(11,8)
+        #f.canvas.draw()
         if params['saveFig'] is True:
-            plt.savefig(outDir+fileRoot+'.pdf',format='pdf')
+            f.savefig(outDir+fileRoot+'.pdf',format='pdf')
         plt.show()    
 
 
 if __name__ == "__main__":
+
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
     SPtemplateFile = scriptPath + '/SPAG4395template.yml'
     TFtemplateFile = scriptPath + '/NWAG4395template.yml'
 
-    parser = argparse.ArgumentParser() 
-    parser.add_argument('paramFile', nargs='?',
-                        help = 'The Parameter file for the measurement. ' \
-                               'If not specified, downloads data from the '\
-                               'live display of the instrument.',
-                        default=None)
-    parser.add_argument('--template', help='Copy template parameter files to'\
-                                           ' current dir; no measurement is'\
-                                           ' made.',
-                        action='store_true')
+    class helpfulParser(argparse.ArgumentParser):
+        def error(self, message):
+            sys.stderr.write('Error: %s\n' % message)
+            self.print_help()
+            sys.exit(2)
+
+    parser = helpfulParser()
+    group = parser.add_mutually_exclusive_group() 
+
+    group.add_argument('paramFile', nargs='?',
+                       help = 'The parameter file for the measurement.',
+                       default=None)
+
+    parser.add_argument('-i', '--ipaddress', help='IP address or hostname. '\
+                        'Overrides parameter file.', default = None)
+
+    parser.add_argument('-a', '--gpibaddress',  help='GPIB address, typically'\
+                        '10. Overrides parameter file.', default = None)
+
+    parser.add_argument('-f', '--filename',  help='Stem of output filename.'\
+                        'Overrides parameter file.', default = None)
+
+    group.add_argument('--template', help='Copy template parameter files to'\
+                       ' current dir; no measurement is made.', 
+                       action='store_true')
+
+    group.add_argument('--reset', help='Resets the AG4396, IP and GPIB address'\
+                       ' are required.', action='store_true')
+
+    group.add_argument('--getdata', help='Downloads live data from an AG4395A.'\
+                       ' IP and GPIB address are required.',
+                       action='store_true')
+
+    group.add_argument('--trigger', help='Trigger a single sweep of the '
+                       'currently configured measurement. IP and GPIB address '
+                       'are required.', action='store_true')
+
+    parser.add_argument('--plot', help='Plot result of measurement. Overrides'\
+                        ' parameter file.', action='store_true',default = None)
+
+    parser.add_argument('--plotRefs', help='Plot reference traces. Overrides'\
+                        ' parameter file. Reads files that have the same'\
+                        ' filename stem as references.',action='store_true', 
+                        default = None)
 
     args = parser.parse_args()
 
-    if args.template:
+    if args.paramFile is not None:
+        main(args.paramFile, args.filename, args.ipaddress, args.gpibaddress,
+             args.plot, args.plotRefs)
+
+    elif args.template:
         import shutil
         print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
-        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPAG4395template.yml')
+        shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPAG4395Atemplate.yml')
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
-        shutil.copyfile(TFtemplateFile, os.getcwd()+'/NWAG4395template.yml')
+        shutil.copyfile(TFtemplateFile, os.getcwd()+'/NWAG4395Atemplate.yml')
         print 'Done!'
+    
+    elif args.ipaddress is None or args.gpibaddress is None:
+        parser.error('Must specify IP and GPIB addresses!\n')
 
-    else:
-        if args.paramFile is None:
-            print 'No parameter file specified! '\
-                  'Will download from current display...'
-        main(args.paramFile)
+    elif args.getdata:
+        main(None, args.filename, args.ipaddress, args.gpibaddress,
+             args.plot, args.plotRefs)
 
+    elif args.reset:
+        gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
+        inst.reset(gpibObj)
+        gpibObj.close()
+
+    elif args.trigger:
+        gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
+        gpibObj.command('SING')
+        gpibObj.close()

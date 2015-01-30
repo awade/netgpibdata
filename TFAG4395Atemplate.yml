@@ -1,0 +1,29 @@
+# Analyzer Details
+deviceName:     AG4395A 
+ipAddress:      vanna       # Ip or hostname of GPIB Device
+gpibAddress:    10          # port of GPIB device (10) is default 
+
+# Output Parameters
+saveDir:        ./          # Path where output is saved, use './' for current dir
+nameRoot:       TFAG4395A   # Filename root for output files
+plotResult:     True        # Whether to plot measured data when finished [True/False]
+plotRefs:       False       # Whether to plot reference traces along with measurement
+refDir:         ./          # Where the reference trace files are stored
+                            # References are found by files with same nameRoot
+saveFig:        True        # If plotResult is true, saves a pdf with same filename [True/False]
+plotTitle:      AG4395A TF Measurement
+
+# Measurement Parameters
+measType:       TF
+startFreq:      1MHz        # Start frequency
+stopFreq:       300MHz      # Stop frequency, 300MHz max
+numOfPoints:    801         # 801 points max for NWAG4395A
+sweepType:      Log         # Sweep type: 'Log' or 'Linear'
+inputMode:      AR          # Input of network analyzer ('AR'->A/R, 'BR'->B/R)
+ifBandwidth:    30kHz       # IF bandwidth, N*10*1Hz and N*10*3Hz only (i.e. 10k, 30k, 100k,...)
+
+# Analyzer Settings
+dataMode:       dBDeg       # "dBDeg", "MagDeg" or "ReIm"
+excAmp:         -10         # Excitation amplitude (in dBm)
+averages:       5           # Number of averages
+attenuation:    auto        # dB of input attenuation for each channel e.g. '20' or 'auto' 

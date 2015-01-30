@@ -1,14 +1,14 @@
 import sys
-import math
+#import math
 import socket
 import time
-import pdb
+#import pdb
 import select
 import struct
 import termstatus
 
 class netGPIB:
-    def __init__(self, ip, gpibAddr, eot='\004', debug=0, auto=False, log=False):
+    def __init__(self, ip, gpibAddr, eot='\004', debug=0, auto=False, log=False, tSleep=0):
 
         #End of Transmission character
         self.eot = eot
@@ -20,6 +20,9 @@ class netGPIB:
 
         #Auto mode
         self.auto = auto
+
+        #Waiting time
+        self.tSleep=tSleep
 
         #Log mode
         self.log = log
@@ -74,7 +77,10 @@ class netGPIB:
         self.netSock.send("++addr "+str(self.gpibAddr)+"\n")
 
 
-    def getData(self, buf, sleep=0.1):
+    def getData(self, buf, sleep=None):
+        if sleep is None:
+            sleep=self.tSleep+0.1
+
         data=""
         dlen=0
         if self.debug == True:
@@ -95,14 +101,16 @@ class netGPIB:
                 break
             else:
                 data = data + data1
-                time.sleep(0.1)
+                time.sleep(sleep)
 
         if self.debug == True:
             progressInfo.end()
         return data
             
-    def query(self,string,buf=100,sleep=0):
+    def query(self,string,buf=100,sleep=None):
         """Send a query to the device and return the result."""
+        if sleep is None:
+            sleep=self.tSleep
         if self.log:
             print >>sys.stderr, "?? %s" % string
         self.netSock.send(string+"\n")
@@ -113,9 +121,22 @@ class netGPIB:
         if self.log:
             print >>sys.stderr, "== %s" % ret.strip()
         return ret
+
+    def srq(self):
+        """Poll the device's SRQ"""
+        self.netSock.send("++srq\n")
+        while 1:  # Read some data
+            readSock, writeSock, errSock = select.select([self.netSock],[],[],3)
+            if len(readSock) == 1:
+                data = readSock[0].recv(100)
+                break
+
+        return data[:-2]
     
-    def command(self,string,sleep=0):
+    def command(self,string,sleep=None):
         """Send a command to the device."""
+        if sleep is None:
+            sleep=self.tSleep
         if self.log:
             print >>sys.stderr, ">> %s" % string
         self.netSock.send(string+"\n")

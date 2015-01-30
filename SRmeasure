@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Custom libaries
-import SR785
+import SR785 as inst
 
 
 def readParams(paramFile):
@@ -25,6 +25,7 @@ def readParams(paramFile):
 
 
 def specPlot(dataArray, nDisp, params, legLabel, axlist):
+    plotTitle = params.get('plotTitle','SR785 Spectrum')
     if nDisp == 2:
         ## Switch this out if your matplotlib is too old to have plt.subplots 
         #f =plt.gcf()
@@ -32,8 +33,6 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
 
         axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel+" (Ch1)")
         axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel+" (Ch2)")
-        #axlist[0].set_title('Channel 1')
-        #axlist[1].set_title('Channel 2')
         axlist[0].set_xscale('log')
         axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist[0].set_yscale('log')
@@ -41,7 +40,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist[0].set_title('SR785 Spectrum Measurement - ' + 
+        axlist[0].set_title(plotTitle+' - ' + 
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
@@ -55,7 +54,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist.set_xlabel('Freq. (Hz)')
         axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist.set_yscale('log')
-        axlist.set_title('SR785 Spectrum Measurement - ' + 
+        axlist.set_title(params['plotTitle']+' - ' + 
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist.axis('tight')
         axlist.grid('on', which='both')
@@ -64,6 +63,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
 
 
 def tfPlot(dataArray,params, legLabel, axlist):
+    plotTitle = params.get('plotTitle','SR785 TF')
     format = params['dataMode']
     if format.lower() == 'reim':
         Carray = dataArray[:,1] + 1j*dataArray[:,2]
@@ -88,7 +88,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].set_xlabel('Freq. (Hz)')
     axlist[1].set_yscale('linear')
     axlist[1].set_ylabel('Phase (deg)')
-    axlist[0].set_title('SR785 TF Measurement - ' + 
+    axlist[0].set_title(plotTitle+' - ' + 
             time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
     axlist[0].axis('tight')
     axlist[1].axis('tight')
@@ -131,7 +131,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         params['plotRefs'] = plotRefs
         params['refDir'] = os.getcwd()+'/'
 
-    gpibObj = SR785.connectGPIB(params['ipAddress'], params['gpibAddress'])
+    gpibObj = inst.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
     # Set up output file names
     params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
@@ -144,8 +144,8 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     # If new measurement is requested, do it!
     if noParam is False:
         print 'Executing measurement specified in '+paramFile
-        SR785.setParameters(gpibObj,params)
-        SR785.measure(gpibObj,params['measType'])
+        inst.setParameters(gpibObj,params)
+        inst.measure(gpibObj,params['measType'])
 
     else: # What kind of measurement are we doing?
         active = int(gpibObj.query('ACTD?')[0])
@@ -169,20 +169,20 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
-    (freq, data) = SR785.download(gpibObj)
+    (freq, data) = inst.download(gpibObj)
 
     # Done measuring! Just output file writing and plotting below
     print('Saving files to '+outDir)
     print('Measurement data will be written into '+outDir+dataFileName)
 
     with open(outDir + dataFileName,'w') as dataFile:
-        SR785.writeHeader(dataFile, params['timeStamp'])
+        inst.writeHeader(dataFile, params['timeStamp'])
 
-        if noParam is False: dataFile.write('# Paramter File: ' 
+        if noParam is False: dataFile.write('# Parameter File: ' 
                                             + params['fileName']+'\n')
 
-        SR785.writeParams(gpibObj, dataFile)
-        SR785.writeData(dataFile, freq, data)
+        inst.writeParams(gpibObj, dataFile)
+        inst.writeData(dataFile, freq, data)
 
     print "Done!"
     gpibObj.close()
@@ -301,11 +301,11 @@ if __name__ == "__main__":
              args.plot, args.plotRefs)
 
     elif args.reset:
-        gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
-        SR785.reset(gpibObj)
+        gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
+        inst.reset(gpibObj)
         gpibObj.close()
 
     elif args.trigger:
-        gpibObj = SR785.connectGPIB(args.ipaddress, args.gpibaddress)
+        gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
         gpibObj.command('STRT')
         gpibObj.close()

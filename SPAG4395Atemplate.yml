@@ -7,10 +7,10 @@ gpibAddress:  10                ## port of GPIB device (10) is default
 saveDir:      ./                ## Path where output is saved, use './' for current dir
 nameRoot:     SPAG4395         ## Filename root for output files
 plotResult:   True              ## Whether to plot measured data when finished [True/Flase]
-plotRefs: False
-plotTitle:    AG4395A Spectrum  ## Title of plot
+plotRefs:     False
 plotScales:   Log,Log           ## Scaling of x and y axes, respectively. Format: [Lin/Log],[Lin/Log]
 saveFig:      False              ## If plotResult is true, saves a pdf with same filename [True/Flase]
+plotTitle:    AG4395A Spectrum Measurement
 
 # Measurement Parameters
 measType:     Spectrum          

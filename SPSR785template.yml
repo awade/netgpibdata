@@ -7,6 +7,7 @@ gpibAddress:    10        # port of GPIB device (10) is default
 saveDir:        ./        # Path where output is saved, use './' for current dir
 nameRoot:       SPSR785   # Filename root for output files
 plotResult:     True      # Whether to plot measured data when finished 
+plotTitle:      SR785 Spectrum Measurement
 plotRefs:       False     # Whether to plot reference traces along with measurement
 refDir:         ./        # Where the reference trace files are stored
                           # References are found by files with same nameRoot

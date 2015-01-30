@@ -1,57 +1,276 @@
 # This module provides data access to Agilent 4395 network analyzer
-
+# Standard Library imports
 import re
 #import sys
-#import math
+#from math import floor
+from numpy import logspace, log10
 import time
-#import netgpib
-import numpy as np
+# Required custom libraries
+import netgpib
+#import termstatus
+
+
+####################
+# GPIB
+####################
+
+
+def connectGPIB(ipAddress,gpibAddress):
+    print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress,tSleep=0.2)
+    print 'Connected.'
+    print "Instrument ID: ",
+    idnString=gpibObj.query("*IDN?")
+    print idnString.splitlines()[-1]
+    return(gpibObj)
+
+
+####################
+# Settings helpers
+####################
+
+def reset(gpibObj):
+    # Call reset command, manual states it takes 12 sec to finish
+    print('Resetting AG4395A...')
+    gpibObj.command("*RST")
+    time.sleep(12)
+    print('Done!')
+
+
+####################
+# Compatibility with old netgpibdata script
+####################
+
+
+def getdata(gpibObj, dataFile, paramFile):
+    # For compatibility with old netgpibdata
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    (freq,data)=download(gpibObj)
+    writeHeader(dataFile, timeStamp)
+    writeData(dataFile, freq, data)
+
+
+def getparam(gpibObj, fileRoot, dataFile, paramFile):
+    # For compatibility with old netgpibdata
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    writeHeader(paramFile, timeStamp)
+    writeParams(gpibObj, paramFile)
+
+
+####################
+# Fetching data
+####################
+
+
+def download(gpibObj):
+    # Put the analyzer on hold
+    gpibObj.command('HOLD')
+
+    #Set the output format to ASCII
+    # TODO: FORM2 binary transfer is many times faster.
+    #       Figure out the string decoding (read raw in netgpib?)
+    gpibObj.command('FORM4')
+    
+    if gpibObj.query('DUAC?')[0] == '1':
+        data=[]
+        freqs=[]
+        for ii in range(2):
+            gpibObj.command('CHAN'+str(ii+1))
+
+            freqString = gpibObj.query('OUTPSWPRM?',1024)
+            chanFreqs = [float(s) for s in re.findall(r'[-+.E0-9]+',freqString)]
+            freqs.append(chanFreqs)
+
+            dataString = gpibObj.query('OUTPDTRC?',1024)
+            chanData = [float(s) for s in re.findall(r'[-+.E0-9]+',dataString)]
+            # If we're taking TFs, but just downloading real data, 
+            # discard the null complex parts
+            if all(val==0 for val in chanData[1::2]):
+                    chanData=chanData[::2]
+            data.append(chanData)
+
+    else:
+        freqString = gpibObj.query('OUTPSWPRM?',1024)
+        freqs = [float(s) for s in re.findall(r'[-+.E0-9]+',freqString)]
+
+        dataString = gpibObj.query('OUTPDTRC?',1024)
+        data = [float(s) for s in re.findall(r'[-+.E0-9]+',dataString)]
+        if all(val==0 for val in chanData[1::2]):
+                data=data[::2]
+
+    return(freqs,data)        
+
+
+####################
+# Output file writing
+####################
+
 
 def writeHeader(dataFile, timeStamp):
     dataFile.write('# AG4395A Measurement\n')
     dataFile.write('# Timestamp: ' + timeStamp+'\n') 
 
+def writeData(dataFile,freq,data):
+    print('Writing measurement data to file...')
+    #Write data vectors
+    if len(freq) > 1: #Dual chan 
+
+        if freq[0] == freq[1]: #Shared Freq axis
+            for i in range(len(freq[0])):
+                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i]) 
+                                + '    ' + str(data[1][i]) + '\n')
+
+        else: #Unequal axes! Kind of awkward to output nicely
+            print('Unequal Frequency Axes, stacking output')
+            for i in range(len(freq[0])):
+                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i]) + '\n')
+            # Print unit line?
+            dataFile.write('# Channel 2 Data\n')
+            for i in range(len(freq[1])):
+                dataFile.write(str(freq[1][i]) + '    ' + str(data[1][i]) + '\n')
+
+    else: #Single display
+        for i in range(len(freq[0])):
+            dataFile.write(str(freq[0][i])+'    '+str(data[0][i])+'\n')
+
+####################
+# Run measurements
+####################
+
+
+def multiMeasure(gpibObj, params):
+    # Assuming that measurement has already been set up
+
+    if not params.has_key('nSegment') or int(params['nSegment']) == 1:
+        measure(gpibObj,params)
+        (freq, data) = download(gpibObj)
+
+    else:
+        nseg = params['nSegment']
+        nDisp = int(gpibObj.query('DUAC?')[0])+1
+
+        # We're doing a pseudo-log sweep!
+        # Need to find segment limits...
+        unitDict={'MHz':1e6,'kHz':1e3,'Hz':1.0,'mHz':1e-3}
+        f1m = re.search('([0-9]+)([A-Za-z]+)',params['startFreq'])
+        f2m = re.search('([0-9]+)([A-Za-z]+)',params['stopFreq'])
+        f1 = float(f1m.group(1))*unitDict[f1m.group(2)]
+        f2 = float(f2m.group(1))*unitDict[f2m.group(2)]
+
+        fLims = round(logspace(log10(f1),log10(f2),nseg+1))
+        
+        # Loop over segments and measure
+        for ii in range(nseg):
+            if nDisp == 2:
+                gpibObj.command('CHAN1')
+                gpibObj.command('STAR '+str(fLims[ii]))
+                gpibObj.command('STOP '+str(fLims[ii+1]))
+                gpibObj.command('CHAN2')
+            gpibObj.command('STAR '+str(fLims[ii]))
+            gpibObj.command('STOP '+str(fLims[ii+1]))
+            print 'Segment '+str(ii+1)+' of '+str(nseg)+'...'
+            measure(gpibObj,params)
+            (fi, di) =download(gpibObj)
+
+            if ii==0:
+                freq=fi
+                data=di
+            else:
+                freq = [prev+new for (prev,new) in zip(freq,fi)]
+                data = [prev+new for (prev,new) in zip(data,di)]
+
+
+def measure(gpibObj, params):
+    gpibObj.command("TRGS INT")
+    gpibObj.command('CLES')
+    gpibObj.command('*SRE 4')
+    gpibObj.command('ESNB 1')
+
+    print 'Preparing to trigger...'
+    nDisp = int(gpibObj.query('DUAC?')[0])+1
+    nAvg = str(params.get('averages',1))
+
+    if nDisp == 2:
+        gpibObj.command('CHAN1')
+        gpibObj.command('AVER ON')
+        gpibObj.command('AVERREST')
+        gpibObj.command('AVERFACT '+nAvg)
+        gpibObj.command('CHAN2')
+
+    gpibObj.command('AVER ON')
+    gpibObj.command('AVERFACT '+nAvg)
+    gpibObj.command('AVERREST') 
+    print 'Taking '+nAvg+' averages...'
+    gpibObj.command('NUMG '+nAvg)
+
+    while not int(gpibObj.srq()):
+        time.sleep(1)
+    print('Done!')
+
+
+####################
+# Saving and setting measurement parameters
+####################
+
+def _parseUnit(string):
+    # Assumes a series of numbers with a few letters at the end
+    # e.g. 30.123kHz
+    prefixD={'n':1e-9,'u':1e-6,'m':1e-3,'k':1e3,'M':1e6,'G':1e9}
+
+    unit = ''.join([s for s in string if s.isalpha()])
+    val = string[:-len(unit)]
+
+    mult = prefixD.get(unit[0],1.0)
+
+    return mult*float(val)
+
 
 def setParameters(gpibObj, params): 
-    # Spectrum only so far!
     gpibObj.command('PRES')
-    time.sleep(0.1)
-    gpibObj.command('SA')
-    time.sleep(0.1)
+    time.sleep(5)
+    gpibObj.command('TRGS INT') # get triggering from GPIB
+    if params['measType'] == 'Spectrum':
+        gpibObj.command('SA')
 
-    # Set up channel inputs
-    if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2: 
+        # Set up channel inputs
+        if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2: 
+            gpibObj.command('DUAC ON')
+
+        for jj in range(len(params['channels'])): 
+            gpibObj.command('CHAN'+str(jj+1))
+            gpibObj.command('MEAS '+params['channels'][jj])
+            if params['specType'].lower() == 'noise':
+                gpibObj.command('FMT '+params['specType'][0:5].upper())
+            elif params['specType'].lower() != 'spectrum':
+                raise ValueError('specType not parsing!')
+            
+            # For now, default noise to V^2/Hz and spectrum to dBm
+            if params['specType'].lower() =='noise':
+                gpibObj.command('SAUNIT V')
+            else:
+                gpibObj.command('SAUNIT DBM')
+            gpibObj.command('AVERFACT '+str(params['averages']))
+            gpibObj.command('AVER OFF')
+            gpibObj.command('STAR '+params['startFreq'])
+            gpibObj.command('STOP '+params['stopFreq'])
+            gpibObj.command('BWAUTO ON')
+            gpibObj.command('BWSRAT '+str(params['bwSpanRatio']))
+            if isinstance(params['attenuation'], basestring):
+                if params['attenuation'].lower() == 'auto':
+                    gpibObj.command('ATTAUTO ON')
+                else:
+                    raise ValueError('Attenuation String not parseable!')
+            else:
+                gpibObj.command('ATTAUTO OFF')
+                gpibObj.command('ATT' +params['channels'][jj] +' ' +str(params['attenuation'])+'DB')
+
+    elif params['measType'] == 'TF':
+        gpibObj.command('NA')
         gpibObj.command('DUAC ON')
-        time.sleep(0.1)
 
-    for jj in range(len(params['channels'])): 
-        gpibObj.command('CHAN'+str(jj+1))
-        time.sleep(0.1)
-        gpibObj.command('MEAS '+params['channels'][jj])
-        time.sleep(0.1)
-        if params['specType'].lower() == 'noise':
-            gpibObj.command('FMT '+params['specType'][0:5].upper())
-        elif params['specType'].lower() != 'spectrum':
-            raise ValueError('specType not parsing!')
-        
-        # For now, default noise to V^2/Hz and spectrum to dBm
-        if params['specType'].lower() =='noise':
-            gpibObj.command('SAUNIT V')
-        else:
-            gpibObj.command('SAUNIT DBM')
-        time.sleep(0.1)
-        gpibObj.command('AVERFACT '+str(params['averages']))
-        time.sleep(0.1)
-        # Stops measurement from proceeding for now?
-        gpibObj.command('AVER OFF')
-        gpibObj.command('STAR '+params['startFreq'])
-        time.sleep(0.1)
-        gpibObj.command('STOP '+params['stopFreq'])
-        time.sleep(0.1)
-        gpibObj.command('BWAUTO ON')
-        time.sleep(0.1)
-        gpibObj.command('BWSRAT '+str(params['bwSpanRatio']))
-        time.sleep(0.1)
+        if not any([params['inputMode'] == s for s in ('AR','BR','AB')]):
+            raise ValueError('Bad inputMode! Must be "AR", "BR" or "AB"!')
+
         if isinstance(params['attenuation'], basestring):
             if params['attenuation'].lower() == 'auto':
                 gpibObj.command('ATTAUTO ON')
@@ -59,285 +278,133 @@ def setParameters(gpibObj, params):
                 raise ValueError('Attenuation String not parseable!')
         else:
             gpibObj.command('ATTAUTO OFF')
-            time.sleep(0.1)
-            gpibObj.command('ATT' +params['channels'][jj] +' ' +str(params['attenuation'])+'DB')
-            time.sleep(0.1)
+            for chan in params['inputMode']:
+                gpibObj.command('ATT' + chan +' ' +str(params['attenuation'])+'DB')
 
-    time.sleep(12)
+        gpibObj.command('SWETAUTO') # auto sweep time
+        if params['sweepType'] == 'Linear':
+            gpibObj.command('SWPT LINF') # sweep lin freq.
+        else:
+            gpibObj.command('SWPT LOGF') # sweep log freq.
+
+        IF = params['ifBandwidth'] # Need to convert to int...
+        if IF == 'auto':
+            gpibObj.command('BWAUTO ON')
+        else:
+            gpibObj.command('BW '+str(IF))      #to set the IF bandwidth
+
+        gpibObj.command('POWE '+str(params['excAmp'])) # units are in dBm
+       
+        gpibObj.command('CHAN1') # choose the active channel
+        gpibObj.command('MEAS '+params['inputMode']) 
+        if 'mag' in params['dataMode'].lower():
+            gpibObj.command('FMT LINM')
+        elif 'reim' in params['dataMode'].lower():
+            gpibObj.command('FMT REAL') 
+        else:
+            gpibObj.command('FMT LOGM') 
+
+        gpibObj.command('CHAN2') 
+        gpibObj.command('MEAS '+params['inputMode']) 
+        if 'reim' in params['dataMode'].lower():
+            gpibObj.command('FMT IMAG')
+        else:
+            gpibObj.command('FMT PHAS') 
+
+        gpibObj.command('AVER ON') # average ON
+        gpibObj.command('POIN '+str(params['numOfPoints'])) 
+
+        gpibObj.command('STAR '+params['startFreq'])
+        gpibObj.command('STOP '+params['stopFreq'])
+
+
+    else:
+        raise ValueError('Can only set parameters for measType="Spectrum" or'
+                         '"TF".')
+    time.sleep(15)
     print('Parameters set!')
 
-def measure(gpibObj, params):
-    nDisp = int(gpibObj.query('DUAC?')[0])+1
-    tim = gpibObj.query("SWET?")
-    tot_time = float(tim)*(params['averages']+1)
 
-    if nDisp == 2:
-        tot_time = tot_time*2
-        gpibObj.command('CHAN1')
-        time.sleep(0.1)
-        gpibObj.command('AVER ON')
-        time.sleep(0.1)
-        gpibObj.command('AVERREST') #Start measurement
-        time.sleep(0.1)
-        gpibObj.command('CONT')
-        time.sleep(0.1)
-        gpibObj.command('CHAN2')
-        time.sleep(0.1)
+def _joinParam(thingList):
+    return ', '.join(['{:}'.format(thing) for thing in thingList])
 
-    gpibObj.command('AVER ON')
-    time.sleep(0.1)
-    gpibObj.command('AVERREST') #Start measurement
-    time.sleep(0.1)
-    gpibObj.command('CONT')
-    time.sleep(1)
-
-    print('Running for '+str(np.round(tot_time,decimals=1))+' seconds...')
-    # Is this really the best way? Can't I query the number of averages, like sr785?
-    # Yes! Read page 5-14 in programming manual, need to figure out how to implement.
-    time.sleep(tot_time)
-    print('Done!')
-
-def downloadData(gpibObj, params=None,quiet=True):
-    # Put the analyzer on hold
-    gpibObj.command('HOLD')
-    time.sleep(0.1)
-
-
-    #Set the output format to ASCII
-    gpibObj.command('FORM4')
-    
-    #Check for the analyzer mode
-    analyzerMode = int(gpibObj.query('NA?'))
-
-    if analyzerMode == 1:
-        # Not sure what the different channels return in each case...
-        # Need to verify that this works when I make NWAG upgrade
-        # It is the network analyzer mode    
-        # In this mode, the data format is real,imag for each frequency point
-        raise ValueError('I cannot do TFs yet!')
-    else: # Spectrum mode!
-        if quiet is False:
-            print('Reading frequency points...')            
-        freqList = gpibObj.query('OUTPSWPRM?',1024)
-        freqs = np.array(map(float,re.findall(r'[-+.E0-9]+', freqList)))
-
-        dataList=[]
-
-        if gpibObj.query('DUAC?')[0] == '1':
-            for ii in range(2):
-                gpibObj.command('CHAN'+str(ii+1))
-                time.sleep(0.5)
-                if quiet is False:
-                    print('Reading data from channel '+str(ii+1))
-                dataStrings = gpibObj.query('OUTPDTRC?',1024)
-                dataList.append(np.array(map(float,re.findall(r'[-+.E0-9]+', dataStrings))))
-        else:
-            if quiet is False:
-                print('Reading data from current display...')
-            dataStrings = gpibObj.query('OUTPDTRC?',1024)
-            dataList.append(np.array(map(float,re.findall(r'[-+.E0-9]+', dataStrings))))
-        
-        data = np.transpose(np.vstack(([column for column in dataList])))
-    return(freqs,data)        
-
-
-def getdata(gpibObj, dataFile, paramFile):
-    #Put the analyzer on hold
-    gpibObj.command('HOLD')
-    time.sleep(0.1)
-
-    #Get the number of data points
-    #numPoints = int(gpibObj.query('POIN?'))
-
-    #Set the output format to ASCII
-    gpibObj.command('FORM4')
-    
-    #Check for the analyzer mode
-    analyzerMode = int(gpibObj.query('NA?'))
-
-    if analyzerMode == 1:
-        # It is the network analyzer mode    
-        # In this mode, the data format is real,imag for each frequency point
-
-        #Get the frequency points
-        print('Reading frequency points.')
-        receivedData=gpibObj.query('OUTPSWPRM?',1024)
-
-        # Parse data
-        # Matching to the second column of dumpedData
-        freqList=re.findall(r'[-+.E0-9]+', receivedData, re.M)
-
-        # Get the data
-        print('Reading data.')
-        receivedData=gpibObj.query('OUTPDATA?',1024)
-
-        # Break the data into lists
-        dataList = re.findall(r'[-+.E0-9]+',receivedData)
-        
-        # Output data
-        print('Writing the data into a file.')
-        
-        j=0;
-        for i in range(len(freqList)):
-            dataFile.write(freqList[i]+', '+dataList[j]+', '+ dataList[j+1]+'\n')
-            j=j+2;
-    else:
-        # It is spectrum analyzer mode
-            
-        #Check if it is the dual channel mode or not
-        numOfChan = int(gpibObj.query('DUAC?')) +1
-
-        # Get the current channel number
-        ans = int(gpibObj.query('CHAN1?'))
-        if ans ==1:
-            currentChannel = 1
-        else:
-            currentChannel = 2
-
-        #Get the data
-
-        dataList=[]
-        freqList=[]
-        # Loop for each channel
-        for i in range(1,numOfChan+1):
-            #ch stores the current channel number
-            if numOfChan == 1:
-                ch=currentChannel
-            else:
-                ch=i
-                
-            # Change the active channel to ch
-            gpibObj.command( 'CHAN'+str(ch))
-            time.sleep(0.5)
-
-            # Get the frequency points
-            print('Reading frequency points for channel '+str(i))            
-            receivedData = gpibObj.query('OUTPSWPRM?',1024)
-
-            # Break into elements
-            freqList = re.findall(r'[-+.E0-9]+', receivedData)
-            
-            print('Reading data from channel '+str(i))
-            receivedData = gpibObj.query('OUTPDATA?',1024)
-                        
-            # Break into elements
-            dataList = re.findall(r'[-+.E0-9]+',receivedData)
-                
-            # Output data
-            print('Writing channel '+str(ch)+' data into a file.')
-            dataFile.write('# Channel '+str(ch)+'\n')
-            for j in range(len(freqList)):
-                dataFile.write(freqList[j]+', '+dataList[j])
-                dataFile.write('\n')
-                
-    # Continue the measurement
-    gpibObj.command( 'CONT\n')                            
-
-def getparam(gpibObj, filename, dataFile, paramFile):
-    #Get measurement parameters
-    
-    print('Reading measurement parameters')
-    
-    #pdb.set_trace()
+def writeParams(gpibObj, paramFile):
     #Check the analyzer mode
-    analyzerMode = int(gpibObj.query('NA?'))
-    analyzerType={1: 'Network Analyzer', 0: 'Spectrum Analyzer'}[analyzerMode]
+    measType={1: 'Network Analyzer', 0: 'Spectrum'}[int(gpibObj.query('NA?'))]
 
-    #Determine labels and units
-    Label=[]
-    Unit=[]
-    if analyzerMode == 1: # Network analyzer mode
-        Label.append('Real Part')
-        Label.append('Imaginary Part')
-        Unit.append('')
-        Unit.append('')
-        numOfChan = 2
-    else:  # Spectrum analyzer mode
-        numOfChan = int(gpibObj.query('DUAC?')) +1
-        for i in range(numOfChan):
-            Label.append('Spectrum')
-            Unit.append('W')
-
-    #Get the current channel number
-    ans=int(gpibObj.query('CHAN1?'))
-    if ans ==1:
-        currentChannel=1
+    nDisp = int(gpibObj.query('DUAC?')) +1
+    if nDisp == 1: 
+        chans=[int(gpibObj.query('CHAN2?'))+1]
     else:
-        currentChannel=2
+        chans=[1,2]
 
-    BW=[]
-    BWAuto=[]
-    MEAS=[]
-    for i in range(numOfChan):
+    bw=[]
+    bwAuto=[]
+    meas=[]
+    fmt=[]
+    saUnit=[]
+    fStart=[]
+    fStop=[]
+    nPoint=[]
+    for chan in chans:
+        #Change the active channel 
+        gpibObj.command('CHAN'+str(chan))
 
-        #ch stores the current channel number
-        if numOfChan == 1:
-            ch=currentChannel
+        # Get bandwidth information
+        bw.append(float(gpibObj.query('BW?')))
+        bwAuto.append({0: 'Off', 1: 'On'}[int(gpibObj.query('BWAUTO?'))])
+
+        # What measurement?
+        meas.append(gpibObj.query('MEAS?')[:-1])
+        fmt.append(gpibObj.query('FMT?')[:-1])
+        if measType=='Spectrum':
+            saUnit.append(gpibObj.query('SAUNIT?')[:-1])
         else:
-            ch=i+1
-                
-        #Change the active channel to ch
-        print('Change channel to '+str(ch))
-        gpibObj.command( 'CHAN'+str(ch))
-        time.sleep(1)
+            excAmp = str(float(gpibObj.query('POWE?'))) + 'dBm'
 
-    # Get bandwidth information
-                  
-        buf=gpibObj.query('BW?')
-        BW.append(buf[:-1])
+        fStart.append(float(gpibObj.query('STAR?')))
+        fStop.append(float(gpibObj.query('STOP?')))
+        nPoint.append(int(gpibObj.query('POIN?')))
 
-        j=int(gpibObj.query('BWAUTO?'))
-        BWAuto.append({0: 'Off', 1: 'On'}[j])
-
-    # Measurement Type
-        gpibObj.command('CHAN'+str(i+1))
-        buf=gpibObj.query('MEAS?')
-        MEAS.append(buf[:-1])
+    fStart = _joinParam(fStart) 
+    fStop = _joinParam(fStop) 
+    bw = _joinParam(bw) 
+    bwAuto = _joinParam(bwAuto) 
+    meas = _joinParam(meas) 
+    fmt = _joinParam(fmt) 
+    saUnit = _joinParam(saUnit) 
+    nPoint = _joinParam(nPoint) 
 
     # Get attenuator information
-    AttnR = str(int(gpibObj.query('ATTR?')))+'dB'
-    AttnA = str(int(gpibObj.query('ATTA?')))+'dB'
-    AttnB = str(int(gpibObj.query('ATTB?')))+'dB'
-    
-    # Source power
-    buf = gpibObj.query('POWE?')
-    SPW = buf[:-1]+'dBm'
-        
-    # Write to the parameter file
-    # Header
-    paramFile.write('Agilent 4395A parameter file\nThis file contains measurement parameters for the data saved in '
-                    +filename+'.dat\n')
-    # For the ease of getting necessary information for plotting the data, several numbers 
-    # and strings are put first.
-    # The format is the number of channels comes first, then the title of the channels and 
-    # the units follow, one per line.
-    #     paramFile.write('#The following lines are for a matlab plotting function\n')
-    #     paramFile.write(str(numOfChan)+'\n')
+    attR = str(int(gpibObj.query('ATTR?'))) + 'dB '
+    attA = str(int(gpibObj.query('ATTA?'))) + 'dB '
+    attB = str(int(gpibObj.query('ATTB?'))) + 'dB '
 
-    paramFile.write('Data format: Freq')
-    for i in range(numOfChan):
-         paramFile.write(', '+Label[i])
-         paramFile.write('('+Unit[i]+')')
+    # Averages 
+    nAvg = str(int(gpibObj.query('AVERFACT?')))
 
-    paramFile.write('\n')
+    print "Writing to the parameter file."
 
-    paramFile.write('##################### Measurement Parameters #############################\n')
-    paramFile.write('Analyzer Type: '+analyzerType+'\n')
-    for i in range(numOfChan):
-        #ch stores the current channel number
-        if numOfChan == 1:
-            ch=currentChannel
-        else:
-            ch=i+1
+    paramFile.write('#---------- Measurement Parameters ------------\n')
+    paramFile.write('# Start Frequency (Hz): '+fStart+'\n')
+    paramFile.write('# Stop Frequency (Hz): '+fStop+'\n')
+    paramFile.write('# Frequency Points: '+nPoint+'\n')
+    paramFile.write('# Measurement Format: '+fmt+'\n')
+    paramFile.write('# Measuremed Input: '+meas+'\n')
 
-        paramFile.write('CH'+str(ch)+' measurement: '+MEAS[i]+'\n')
-    
-    for i in range(numOfChan):
-        paramFile.write('CH'+str(ch)+' bandwidth: '+BW[i]+'\n')
-        paramFile.write('CH'+str(ch)+' auto bandwidth: '+BWAuto[i]+'\n')
-    
-    paramFile.write('R attenuator: '+AttnR+'\n')
-    paramFile.write('A attenuator: '+AttnA+'\n')
-    paramFile.write('B attenuator: '+AttnB+'\n')
+    paramFile.write('#---------- Analyzer Settings ----------\n')
+    paramFile.write('# Number of Averages: '+nAvg+'\n')
+    paramFile.write('# Auto Bandwidth: '+bwAuto+'\n')
+    paramFile.write('# IF Bandwidth: '+bw+'\n')
+    paramFile.write('# Input Attenuators (R,A,B): '+attR+attA+attB+'\n')
+    if measType == 'Spectrum':
+        paramFile.write('# Units: '+saUnit+'\n')
+    else:
+        paramFile.write('# Excitation amplitude = '+excAmp+'\n')
 
-    paramFile.write('Source power: '+SPW+'\n')
+    paramFile.write('#---------- Measurement Data ----------\n')
+    paramFile.write('# [Freq(Hz) ')
+
+    for chan in chans:
+        paramFile.write('Chan '+str(chan)+' ')
+    paramFile.write(']\n')

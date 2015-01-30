@@ -8,6 +8,7 @@ import time
 import netgpib
 import termstatus
 
+
 ####################
 # GPIB
 ####################
@@ -16,7 +17,7 @@ import termstatus
 def connectGPIB(ipAddress,gpibAddress):
     print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
     gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
-    print 'done.'
+    print 'Connected.'
     #Set output to GPIB
     gpibObj.command("OUTX0")
     # Print IDN

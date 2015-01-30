@@ -11,6 +11,7 @@ plotRefs:       False     # Whether to plot reference traces along with measurem
 refDir:         ./        # Where the reference trace files are stored
                           # References are found by files with same nameRoot
 saveFig:        True      # If plotResult is true, saves a pdf with same filename
+plotTitle:      SR785 TF Measurement
 
 # Measurement Parameters
 measType:       TF
