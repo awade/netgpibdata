@@ -249,8 +249,8 @@ if __name__ == "__main__":
 
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
-    SPtemplateFile = scriptPath + '/SPAG4395template.yml'
-    TFtemplateFile = scriptPath + '/NWAG4395template.yml'
+    SPtemplateFile = scriptPath + '/SPAG4395Atemplate.yml'
+    TFtemplateFile = scriptPath + '/TFAG4395Atemplate.yml'
 
     class helpfulParser(argparse.ArgumentParser):
         def error(self, message):
