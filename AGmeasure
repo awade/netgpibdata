@@ -26,7 +26,7 @@ def readParams(paramFile):
 def specPlot(dataArray, nDisp, params, legLabel, axlist):
     plotTitle = params.get('plotTitle','AG4395A Spectrum')
     if nDisp == 2:
-        ## Switch this out if your matplotlib is too old to have plt.subplots 
+        ## Switch this out if your matplotlib is too old to have plt.subplots
         #f =plt.gcf()
         #axlist=[plt.subplot(211), plt.subplot(212)]
 
@@ -39,7 +39,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist[0].set_title(plotTitle+' - ' + 
+        axlist[0].set_title(plotTitle+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
@@ -53,7 +53,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist.set_xlabel('Freq. (Hz)')
         axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist.set_yscale('log')
-        axlist.set_title(params['plotTitle']+' - ' + 
+        axlist.set_title(params['plotTitle']+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist.axis('tight')
         axlist.grid('on', which='both')
@@ -74,7 +74,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
         print 'Problem detecting units for plot... assuming dB, Degrees'
         Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
 
-    ## Switch this out if your matplotlib is too old to have plt.subplots 
+    ## Switch this out if your matplotlib is too old to have plt.subplots
     #f =plt.gcf()
     #axlist=[plt.subplot(211), plt.subplot(212)]
     axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
@@ -87,7 +87,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].set_xlabel('Freq. (Hz)')
     axlist[1].set_yscale('linear')
     axlist[1].set_ylabel('Phase (deg)')
-    axlist[0].set_title(plotTitle+' - ' + 
+    axlist[0].set_title(plotTitle+' - ' +
             time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
     axlist[0].axis('tight')
     axlist[1].axis('tight')
@@ -98,7 +98,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].get_legend().get_frame().set_alpha(.7)
 
 
-def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None, 
+def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
          plotResult=None, plotRefs=None):
     if paramFile is None:
         # Set sensible defaults for downloading live data
@@ -121,7 +121,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         params['nameRoot'] = filename.split('.')[0]
         if '.' in filename:
             fileExt = ''.join(filename.split('.')[1:])
-    if ipAddress is not None: 
+    if ipAddress is not None:
         params['ipAddress'] = ipAddress
     if gpibAddress is not None:
         params['gpibAddress'] = gpibAddress
@@ -135,9 +135,9 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     gpibObj = inst.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
     # Set up output file names
-    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
-    fileRoot = (params['nameRoot'] + '_' + 
-                time.strftime('%d-%m-%Y', time.localtime()) + 
+    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
+    fileRoot = (params['nameRoot'] + '_' +
+                time.strftime('%d-%m-%Y', time.localtime()) +
                 time.strftime('_%H%M%S', time.localtime()))
     dataFileName = fileRoot+fileExt
     outDir = params['saveDir'];
@@ -151,7 +151,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     else: # What kind of measurement are we doing?
         params['measType']={1: 'TF', 0: 'Spectrum'}[int(gpibObj.query('NA?'))]
         nDisp = int(gpibObj.query('DUAC?')) +1
-        if nDisp == 1: 
+        if nDisp == 1:
             chans=[int(gpibObj.query('CHAN2?'))+1]
         else:
             chans=[1,2]
@@ -171,11 +171,11 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         elif params['measType']=='TF':
             # What if channel 1 and 2 are swapped from the expected placement?
             if fmt==['LOGM','PHAS']:
-                params['dataMode']='dbdeg'            
+                params['dataMode']='dbdeg'
             elif fmt==['LINM','PHAS']:
-                params['dataMode']='magdeg'            
+                params['dataMode']='magdeg'
             elif fmt==['REAL','IMAG']:
-                params['dataMode']='reim'            
+                params['dataMode']='reim'
             else:
                 params['dataMode']=str(fmt)
                 if params['plotResult'] is True:
@@ -196,7 +196,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     with open(outDir + dataFileName,'w') as dataFile:
         inst.writeHeader(dataFile, params['timeStamp'])
 
-        if noParam is False: dataFile.write('# Parameter File: ' 
+        if noParam is False: dataFile.write('# Parameter File: '
                                             + params['fileName']+'\n')
 
         inst.writeParams(gpibObj, dataFile)
@@ -213,7 +213,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
-            refFiles = [ rf for rf in os.listdir(params['refDir']) 
+            refFiles = [ rf for rf in os.listdir(params['refDir'])
                          if (params['nameRoot'] in rf and '.txt' in rf and
                              rf != dataFileName)]
             print 'Found ' + str(len(refFiles)) + ' references; plotting...'
@@ -242,15 +242,15 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         #f.canvas.draw()
         if params['saveFig'] is True:
             f.savefig(outDir+fileRoot+'.pdf',format='pdf')
-        plt.show()    
+        plt.show()
 
 
 if __name__ == "__main__":
 
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
-    SPtemplateFile = scriptPath + '/SPAG4395Atemplate.yml'
-    TFtemplateFile = scriptPath + '/TFAG4395Atemplate.yml'
+    SPtemplateFile = scriptPath + '/SPAG4395template.yml'
+    TFtemplateFile = scriptPath + '/NWAG4395template.yml'
 
     class helpfulParser(argparse.ArgumentParser):
         def error(self, message):
@@ -259,7 +259,7 @@ if __name__ == "__main__":
             sys.exit(2)
 
     parser = helpfulParser()
-    group = parser.add_mutually_exclusive_group() 
+    group = parser.add_mutually_exclusive_group()
 
     group.add_argument('paramFile', nargs='?',
                        help = 'The parameter file for the measurement.',
@@ -275,7 +275,7 @@ if __name__ == "__main__":
                         'Overrides parameter file.', default = None)
 
     group.add_argument('--template', help='Copy template parameter files to'\
-                       ' current dir; no measurement is made.', 
+                       ' current dir; no measurement is made.',
                        action='store_true')
 
     group.add_argument('--reset', help='Resets the AG4396, IP and GPIB address'\
@@ -289,12 +289,15 @@ if __name__ == "__main__":
                        'currently configured measurement. IP and GPIB address '
                        'are required.', action='store_true')
 
+    group.add_argument('--monit', help='Live plotting of the active display, '
+                       'IP and GPIB address are required.', action='store_true')
+
     parser.add_argument('--plot', help='Plot result of measurement. Overrides'\
                         ' parameter file.', action='store_true',default = None)
 
     parser.add_argument('--plotRefs', help='Plot reference traces. Overrides'\
                         ' parameter file. Reads files that have the same'\
-                        ' filename stem as references.',action='store_true', 
+                        ' filename stem as references.',action='store_true',
                         default = None)
 
     args = parser.parse_args()
@@ -310,7 +313,7 @@ if __name__ == "__main__":
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
         shutil.copyfile(TFtemplateFile, os.getcwd()+'/NWAG4395Atemplate.yml')
         print 'Done!'
-    
+
     elif args.ipaddress is None or args.gpibaddress is None:
         parser.error('Must specify IP and GPIB addresses!\n')
 

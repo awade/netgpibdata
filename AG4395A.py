@@ -44,7 +44,7 @@ def reset(gpibObj):
 
 def getdata(gpibObj, dataFile, paramFile):
     # For compatibility with old netgpibdata
-    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
     (freq,data)=download(gpibObj)
     writeHeader(dataFile, timeStamp)
     writeData(dataFile, freq, data)
@@ -52,7 +52,7 @@ def getdata(gpibObj, dataFile, paramFile):
 
 def getparam(gpibObj, fileRoot, dataFile, paramFile):
     # For compatibility with old netgpibdata
-    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
     writeHeader(paramFile, timeStamp)
     writeParams(gpibObj, paramFile)
 
@@ -70,35 +70,32 @@ def download(gpibObj):
     # TODO: FORM2 binary transfer is many times faster.
     #       Figure out the string decoding (read raw in netgpib?)
     gpibObj.command('FORM4')
-    
-    if gpibObj.query('DUAC?')[0] == '1':
-        data=[]
-        freqs=[]
-        for ii in range(2):
-            gpibObj.command('CHAN'+str(ii+1))
 
-            freqString = gpibObj.query('OUTPSWPRM?',1024)
-            chanFreqs = [float(s) for s in re.findall(r'[-+.E0-9]+',freqString)]
-            freqs.append(chanFreqs)
-
-            dataString = gpibObj.query('OUTPDTRC?',1024)
-            chanData = [float(s) for s in re.findall(r'[-+.E0-9]+',dataString)]
-            # If we're taking TFs, but just downloading real data, 
-            # discard the null complex parts
-            if all(val==0 for val in chanData[1::2]):
-                    chanData=chanData[::2]
-            data.append(chanData)
-
+    data=[]
+    freqs=[]
+    nDisp = int(gpibObj.query('DUAC?')) +1
+    if nDisp == 1:
+        chans=[int(gpibObj.query('CHAN2?'))+1]
     else:
+        chans=[1,2]
+
+    for chan in chans:
+        gpibObj.command('CHAN'+str(chan))
+
         freqString = gpibObj.query('OUTPSWPRM?',1024)
-        freqs = [float(s) for s in re.findall(r'[-+.E0-9]+',freqString)]
+        chanFreqs = [float(s) for s in re.findall(r'[-+.E0-9]+',freqString)]
+        freqs.append(chanFreqs)
 
         dataString = gpibObj.query('OUTPDTRC?',1024)
-        data = [float(s) for s in re.findall(r'[-+.E0-9]+',dataString)]
+        chanData = [float(s) for s in re.findall(r'[-+.E0-9]+',dataString)]
+        # If we're taking TFs, but just downloading real data,
+        # discard the null complex parts
         if all(val==0 for val in chanData[1::2]):
-                data=data[::2]
+                chanData=chanData[::2]
+        data.append(chanData)
 
-    return(freqs,data)        
+
+    return(freqs,data)
 
 
 ####################
@@ -108,16 +105,16 @@ def download(gpibObj):
 
 def writeHeader(dataFile, timeStamp):
     dataFile.write('# AG4395A Measurement\n')
-    dataFile.write('# Timestamp: ' + timeStamp+'\n') 
+    dataFile.write('# Timestamp: ' + timeStamp+'\n')
 
 def writeData(dataFile,freq,data):
     print('Writing measurement data to file...')
     #Write data vectors
-    if len(freq) > 1: #Dual chan 
+    if len(freq) > 1: #Dual chan
 
         if freq[0] == freq[1]: #Shared Freq axis
             for i in range(len(freq[0])):
-                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i]) 
+                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i])
                                 + '    ' + str(data[1][i]) + '\n')
 
         else: #Unequal axes! Kind of awkward to output nicely
@@ -158,7 +155,7 @@ def multiMeasure(gpibObj, params):
         f2 = float(f2m.group(1))*unitDict[f2m.group(2)]
 
         fLims = round(logspace(log10(f1),log10(f2),nseg+1))
-        
+
         # Loop over segments and measure
         for ii in range(nseg):
             if nDisp == 2:
@@ -199,7 +196,7 @@ def measure(gpibObj, params):
 
     gpibObj.command('AVER ON')
     gpibObj.command('AVERFACT '+nAvg)
-    gpibObj.command('AVERREST') 
+    gpibObj.command('AVERREST')
     print 'Taking '+nAvg+' averages...'
     gpibObj.command('NUMG '+nAvg)
 
@@ -225,7 +222,7 @@ def _parseUnit(string):
     return mult*float(val)
 
 
-def setParameters(gpibObj, params): 
+def setParameters(gpibObj, params):
     gpibObj.command('PRES')
     time.sleep(5)
     gpibObj.command('TRGS INT') # get triggering from GPIB
@@ -233,17 +230,17 @@ def setParameters(gpibObj, params):
         gpibObj.command('SA')
 
         # Set up channel inputs
-        if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2: 
+        if params['dualChannel'].lower() == 'dual' and len(params['channels'])==2:
             gpibObj.command('DUAC ON')
 
-        for jj in range(len(params['channels'])): 
+        for jj in range(len(params['channels'])):
             gpibObj.command('CHAN'+str(jj+1))
             gpibObj.command('MEAS '+params['channels'][jj])
             if params['specType'].lower() == 'noise':
                 gpibObj.command('FMT '+params['specType'][0:5].upper())
             elif params['specType'].lower() != 'spectrum':
                 raise ValueError('specType not parsing!')
-            
+
             # For now, default noise to V^2/Hz and spectrum to dBm
             if params['specType'].lower() =='noise':
                 gpibObj.command('SAUNIT V')
@@ -294,25 +291,25 @@ def setParameters(gpibObj, params):
             gpibObj.command('BW '+str(IF))      #to set the IF bandwidth
 
         gpibObj.command('POWE '+str(params['excAmp'])) # units are in dBm
-       
+
         gpibObj.command('CHAN1') # choose the active channel
-        gpibObj.command('MEAS '+params['inputMode']) 
+        gpibObj.command('MEAS '+params['inputMode'])
         if 'mag' in params['dataMode'].lower():
             gpibObj.command('FMT LINM')
         elif 'reim' in params['dataMode'].lower():
-            gpibObj.command('FMT REAL') 
+            gpibObj.command('FMT REAL')
         else:
-            gpibObj.command('FMT LOGM') 
+            gpibObj.command('FMT LOGM')
 
-        gpibObj.command('CHAN2') 
-        gpibObj.command('MEAS '+params['inputMode']) 
+        gpibObj.command('CHAN2')
+        gpibObj.command('MEAS '+params['inputMode'])
         if 'reim' in params['dataMode'].lower():
             gpibObj.command('FMT IMAG')
         else:
-            gpibObj.command('FMT PHAS') 
+            gpibObj.command('FMT PHAS')
 
         gpibObj.command('AVER ON') # average ON
-        gpibObj.command('POIN '+str(params['numOfPoints'])) 
+        gpibObj.command('POIN '+str(params['numOfPoints']))
 
         gpibObj.command('STAR '+params['startFreq'])
         gpibObj.command('STOP '+params['stopFreq'])
@@ -333,7 +330,7 @@ def writeParams(gpibObj, paramFile):
     measType={1: 'Network Analyzer', 0: 'Spectrum'}[int(gpibObj.query('NA?'))]
 
     nDisp = int(gpibObj.query('DUAC?')) +1
-    if nDisp == 1: 
+    if nDisp == 1:
         chans=[int(gpibObj.query('CHAN2?'))+1]
     else:
         chans=[1,2]
@@ -347,7 +344,7 @@ def writeParams(gpibObj, paramFile):
     fStop=[]
     nPoint=[]
     for chan in chans:
-        #Change the active channel 
+        #Change the active channel
         gpibObj.command('CHAN'+str(chan))
 
         # Get bandwidth information
@@ -366,21 +363,21 @@ def writeParams(gpibObj, paramFile):
         fStop.append(float(gpibObj.query('STOP?')))
         nPoint.append(int(gpibObj.query('POIN?')))
 
-    fStart = _joinParam(fStart) 
-    fStop = _joinParam(fStop) 
-    bw = _joinParam(bw) 
-    bwAuto = _joinParam(bwAuto) 
-    meas = _joinParam(meas) 
-    fmt = _joinParam(fmt) 
-    saUnit = _joinParam(saUnit) 
-    nPoint = _joinParam(nPoint) 
+    fStart = _joinParam(fStart)
+    fStop = _joinParam(fStop)
+    bw = _joinParam(bw)
+    bwAuto = _joinParam(bwAuto)
+    meas = _joinParam(meas)
+    fmt = _joinParam(fmt)
+    saUnit = _joinParam(saUnit)
+    nPoint = _joinParam(nPoint)
 
     # Get attenuator information
     attR = str(int(gpibObj.query('ATTR?'))) + 'dB '
     attA = str(int(gpibObj.query('ATTA?'))) + 'dB '
     attB = str(int(gpibObj.query('ATTB?'))) + 'dB '
 
-    # Averages 
+    # Averages
     nAvg = str(int(gpibObj.query('AVERFACT?')))
 
     print "Writing to the parameter file."
