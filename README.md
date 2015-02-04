@@ -3,9 +3,9 @@ netgpibdata
 
 GPIB programs for 40m lab use
 
-SRmeasure
+SRmeasure, AGmeasure
 ---------
-This program sets up, runs, and downloads the results of measurements performed on a SR785 signal analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by the yellow prologix boxes). 
+These program sets up, runs, and downloads the results of measurements performed on a SR785 signal analyzer, or an AG4395A network analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by the yellow prologix boxes). In the case of the AG4395A, spectrum analyzer mode has the capability of splitting up the measurement logarithmically, to have reasonable resolution when taking spectra over a large bandwidth. 
 
 Ran without any arguments, the programs displays help text, detailing the available commands. These include options to:
 
@@ -23,9 +23,6 @@ Python package dependencies:
 
 In ubuntu, these can be installed via `sudo apt-get install python-numpy python-matplotlib python-yaml`
 
-(Older scripts for the SR785 are included in the "oldScripts" directory. )
+(Older scripts are included in the "oldScripts" directory. )
 
-AGmeasure (In progress)
------------------------
-This program is analagous to SRmeasure, but for the agilent AG4395 network analyzer. 
-Currently, only spectrum analyzer mode is supported. The program has the capability of splitting up the measurement logarithmically, to have reasonable resolution when taking spectra over a large bandwidth. 
+
