@@ -250,7 +250,7 @@ if __name__ == "__main__":
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
     SPtemplateFile = scriptPath + '/SPAG4395template.yml'
-    TFtemplateFile = scriptPath + '/NWAG4395template.yml'
+    TFtemplateFile = scriptPath + '/TFAG4395template.yml'
 
     class helpfulParser(argparse.ArgumentParser):
         def error(self, message):
@@ -311,7 +311,7 @@ if __name__ == "__main__":
         print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
         shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPAG4395Atemplate.yml')
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
-        shutil.copyfile(TFtemplateFile, os.getcwd()+'/NWAG4395Atemplate.yml')
+        shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFAG4395Atemplate.yml')
         print 'Done!'
 
     elif args.ipaddress is None or args.gpibaddress is None:
