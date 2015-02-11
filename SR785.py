@@ -51,7 +51,7 @@ def psdOff(gpibObj):
         gpibObj.command('MEAS0,1')
         gpibObj.command('PSDU0,0')
         gpibObj.command('PSDU1,0')
-        time.sleep(.5)         
+        time.sleep(.5)
         gpibObj.command('MGRP2,'+mGrp.split('\n')[0])
         gpibObj.command('MEAS0,'+meas0.split('\n')[0])
         gpibObj.command('MEAS1,'+meas1.split('\n')[0])
@@ -64,7 +64,7 @@ def psdOff(gpibObj):
 
 def getdata(gpibObj, dataFile, paramFile):
     # For compatibility with old netgpibdata
-    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
     gpibObj.command("OUTX0")
     time.sleep(0.1)
     (freq,data)=download(gpibObj)
@@ -74,7 +74,7 @@ def getdata(gpibObj, dataFile, paramFile):
 
 def getparam(gpibObj, fileRoot, dataFile, paramFile):
     # For compatibility with old netgpibdata
-    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
+    timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
     writeHeader(paramFile, timeStamp)
     writeParams(gpibObj, paramFile)
 
@@ -90,13 +90,13 @@ def download(gpibObj):
     if gpibObj.query('DFMT?')[0] != 0: # Dual channel, or overlay
         for disp in range(2):
             print('Downloading data from display #'+str(disp))
-            (f,d)=downloadDisplay(gpibObj, disp)        
+            (f,d)=downloadDisplay(gpibObj, disp)
             freq.append(f)
             data.append(d)
     else:
         active = int(gpibObj.query('ACTD?')[0])
         print('Downloading data from display #'+str(active))
-        (f,d)=downloadDisplay(gpibObj, active)        
+        (f,d)=downloadDisplay(gpibObj, active)
         freq.append(f)
         data.append(d)
 
@@ -104,7 +104,7 @@ def download(gpibObj):
 
 
 def downloadDisplay(gpibObj, disp):
-    #Get the number of points on the Display 
+    #Get the number of points on the Display
     numPoint = int(gpibObj.query('DSPN?'+str(disp),100))
     freq=[]
     data=[]
@@ -126,7 +126,7 @@ def downloadDisplay(gpibObj, disp):
         d=d[:-1] #Chop new line character
         freq.append(f)
         data.append(d)
-        
+
     progressInfo.end('100%')
     time.sleep(1)
     return (freq,data)
@@ -176,7 +176,7 @@ def measure(gpibObj, measType):
     gpibObj.command('STRT') #Start
     #Wait for the measurement to end
     measuring = True
-    
+
     if measType == 'Spectrum':
         print 'Starting ' + measType + ' measurement...'
         time.sleep(0.1)
@@ -194,14 +194,14 @@ def measure(gpibObj, measType):
         gpibObj.command('ASCL1') #Auto scale
 
     elif measType =='TF':
-        print 'Starting ' + measType + ' measurement...' 
+        print 'Starting ' + measType + ' measurement...'
         time.sleep(1)
         numPoints=int(gpibObj.query('SNPS?0')) #Number of points
         progressInfo=termstatus.progressBar(20,numPoints)
         while measuring:
-            #Get status 
+            #Get status
             ## Manual says we should check bit 0 as well...
-            #measuring = not (int(gpibObj.query('DSPS?4')) 
+            #measuring = not (int(gpibObj.query('DSPS?4'))
             #                 or int(gpibObj.query('DSPS?0')))
             measuring = not int(gpibObj.query('DSPS?4'))
             time.sleep(0.1)
@@ -218,7 +218,7 @@ def measure(gpibObj, measType):
 def writeParams(gpibObj, paramFile):
     #Get measurement parameters
     print('Reading instrument parameters')
-        
+
     #Get the display format
     if int(gpibObj.query("DFMT?")) != 0:
         dispList = range(2)
@@ -235,11 +235,11 @@ def writeParams(gpibObj, paramFile):
 
     for disp in dispList:
         i=int(gpibObj.query("MGRP?"+str(disp)))
-        measGrp.append({0: 'FFT' , 
-                         1: 'Correlation', 
-                         2: 'Octave', 
-                         3: 'Swept Sine', 
-                         4: 'Order', 
+        measGrp.append({0: 'FFT' ,
+                         1: 'Correlation',
+                         2: 'Octave',
+                         3: 'Swept Sine',
+                         4: 'Order',
                          5: 'Time/Histogram'}[i])
 
     #Get measurement
@@ -349,7 +349,7 @@ def writeParams(gpibObj, paramFile):
         #Units
         result=gpibObj.query('UNIT?'+str(disp))
         result=result[:-1]  # Chop a new line character
-        unit.append(result.replace('\xfb','rt'))   
+        unit.append(result.replace('\xfb','rt'))
 
     #Input Source
     i=int(gpibObj.query("ISRC?"))
@@ -389,8 +389,8 @@ def writeParams(gpibObj, paramFile):
     CH1Range=str(float(match.group(1)))
     match=re.search(r'\d,(\d)',result)
     i=int(match.group(1))
-    CH1Range=CH1Range+{0: 'dBVpk', 1: 'dBVpp', 2: 'dBVrms', 3: 'Vpk', 4: 'Vpp', 
-                       5: 'Vrms', 6: 'dBEUpk', 7: 'dBEUpp', 8: 'dBEUrms', 
+    CH1Range=CH1Range+{0: 'dBVpk', 1: 'dBVpp', 2: 'dBVrms', 3: 'Vpk', 4: 'Vpp',
+                       5: 'Vrms', 6: 'dBEUpk', 7: 'dBEUpp', 8: 'dBEUrms',
                        9: 'EUpk', 10: 'EUpp', 11: 'EUrms'}[i]
 
     result=gpibObj.query("I2RG?")
@@ -399,7 +399,7 @@ def writeParams(gpibObj, paramFile):
     match=re.search(r'\d,(\d)',result)
     i=int(match.group(1))
     CH2Range=CH2Range+{0: 'dBVpk', 1: 'dBVpp', 2: 'dBVrms', 3: 'Vpk', 4: 'Vpp',
-                       5: 'Vrms', 6: 'dBEUpk', 7: 'dBEUpp', 8: 'dBEUrms', 
+                       5: 'Vrms', 6: 'dBEUpk', 7: 'dBEUpp', 8: 'dBEUrms',
                        9: 'EUpk', 10: 'EUpp', 11: 'EUrms'}[i]
 
     #Auto Range
@@ -433,7 +433,7 @@ def writeParams(gpibObj, paramFile):
         SrcAmp=str(float(match.group(1)))
         match=re.search(r'\d,(\d)',result)
         i=int(match.group(1))
-        SrcAmp=SrcAmp+{0: 'mVpk', 1: 'mVpp', 2: 'mVrms', 3: 'Vpk', 4: 'Vrms', 
+        SrcAmp=SrcAmp+{0: 'mVpk', 1: 'mVpp', 2: 'mVrms', 3: 'Vpk', 4: 'Vrms',
                        5: 'dBVpk', 6: 'dBVpp', 7: 'dBVrms'}[i]
     elif SrcType == "Chirp":
         result=gpibObj.query("CAMP?")
@@ -452,8 +452,8 @@ def writeParams(gpibObj, paramFile):
     else:
         result=float(gpibObj.query("AAMP?"))
         SrcAmp=str(result/100)+"V"
-     
-    SrcOn = gpibObj.query("SRCO?") 
+
+    SrcOn = gpibObj.query("SRCO?")
 
     print "Writing to the parameter file."
 
@@ -462,8 +462,8 @@ def writeParams(gpibObj, paramFile):
     if measGrp[0] == 'FFT':
         startFreq=gpibObj.query("FSTR?0")[:-1]
         spanFreq=gpibObj.query("FSPN?0")[:-1]
-        resDict={'0':'100', '1':'200', '2':'400', '3':'800'} 
-        numOfPoints = resDict[gpibObj.query("FLIN?"+str(0))[:-1]] 
+        resDict={'0':'100', '1':'200', '2':'400', '3':'800'}
+        numOfPoints = resDict[gpibObj.query("FLIN?"+str(0))[:-1]]
         numAvg = gpibObj.query("FAVN?0")[:-1]
         avgModDict = {'0':"None", '1':"Vector", '2':"RMS", '3':"PeakHold"}
         avgMode = avgModDict[gpibObj.query("FAVM?0")[:-1]]
@@ -512,7 +512,7 @@ def writeParams(gpibObj, paramFile):
     for disp in dispList:
         paramFile.write(' "'+unit[disp]+'"')
     paramFile.write('\n')
-    
+
     paramFile.write('#---------- Input Parameters ----------\n')
     paramFile.write('# Input Source: ')
     paramFile.write(inputSource+'\n')
@@ -530,7 +530,7 @@ def writeParams(gpibObj, paramFile):
     paramFile.write(CH1AutoRangeMode+', '+CH2AutoRangeMode+'\n')
     paramFile.write('# Anti-Aliasing Filter: ')
     paramFile.write(CH1AAFilter+', '+CH2AAFilter+'\n')
-    
+
     paramFile.write('#---------- Source Parameters ----------\n')
     paramFile.write('# Source Type: ')
     paramFile.write(SrcType+"\n")
@@ -549,7 +549,7 @@ def writeParams(gpibObj, paramFile):
 def setParameters(gpibObj,params):
     # Read dictionary of settings to set up the instrument
     print 'Setting up parameters for the measurement...'
-    
+
     if params['measType'] == 'Spectrum':
         if params['numOfPoints'] <= 100:
             fRes=0 # Resolution is 100 points
@@ -598,8 +598,8 @@ def setParameters(gpibObj,params):
             arModeID='1'
         else:
             arModeID='0'
-        gpibObj.command('I1AR'+arModeID) #Auto Range Mode 
-        gpibObj.command('I2AR'+arModeID) #Auto Range Mode 
+        gpibObj.command('I1AR'+arModeID) #Auto Range Mode
+        gpibObj.command('I2AR'+arModeID) #Auto Range Mode
         gpibObj.command('A1RG1') #AutoRange On
         gpibObj.command('A2RG1') #AutoRange On
         gpibObj.command('I1AF1') #Anti-Aliasing filter On
@@ -627,7 +627,7 @@ def setParameters(gpibObj,params):
         else:
             gpibObj.command('FBAS2,0') # Base Frequency = 100.0kHz
 
-        if  params['dataMode'] == "dbVrms/rtHz": 
+        if  params['dataMode'] == "dbVrms/rtHz":
             for disp in range(numDisp):
                 gpibObj.command('UNDB'+str(disp)+','+str(1))   # dB ON
                 gpibObj.command('UNPK'+str(disp)+','+str(0))   # Vrms OFF
@@ -637,12 +637,12 @@ def setParameters(gpibObj,params):
                 gpibObj.command('UNPK'+str(disp)+','+str(2))   # Vrms ON
 
         for disp in range(numDisp):
-            gpibObj.command('ACTD'+str(disp)) # Change active display 
-            gpibObj.command('MEAS'+str(disp)+','+str(disp)) # 0:FFT1, 1:FFT2    
+            gpibObj.command('ACTD'+str(disp)) # Change active display
+            gpibObj.command('MEAS'+str(disp)+','+str(disp)) # 0:FFT1, 1:FFT2
             gpibObj.command('VIEW'+str(disp)+',0') #Log Magnitude
             gpibObj.command('PSDU'+str(disp)+',1') # PSD ON
             gpibObj.command('DISP'+str(disp)+',1') # Live display on
-        
+
         gpibObj.command('FLIN2,'+str(fRes))     # Frequency resolution
         gpibObj.command('FAVG2,1')              # Averaging On
 
@@ -701,8 +701,8 @@ def setParameters(gpibObj,params):
             arModeID='1'
         else:
             arModeID='0'
-        gpibObj.command('I1AR'+arModeID) #Auto Range Mode 
-        gpibObj.command('I2AR'+arModeID) #Auto Range Mode 
+        gpibObj.command('I1AR'+arModeID) #Auto Range Mode
+        gpibObj.command('I2AR'+arModeID) #Auto Range Mode
         gpibObj.command('A1RG1') #AutoRange On
         gpibObj.command('A2RG1') #AutoRange On
         gpibObj.command('I1AF1') #Anti-Aliasing filter On
