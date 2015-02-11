@@ -211,6 +211,8 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
                                             np.array(data,dtype='float'))))
 
         f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
+
+        # Plot references if desired
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
             refFiles = [ rf for rf in os.listdir(params['refDir'])
@@ -223,23 +225,30 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
             for filename in refFiles:
                 refArray = np.loadtxt(params['refDir']+filename)
 
-                # Find timestamp of Ref for the legend
+                # Find memo or timestamp of Ref for the legend
                 with open(params['refDir']+filename,'r') as rf:
-                    tLine = [line for i, line in enumerate(rf) if i==1]
+                    foundLine = True
+                    for line in rf:
+                        if foundLine is False:
+                            if 'Memo:' in line:
+                                legendLine = line.split('Memo:')[1:]
+                                foundLine=True
+                            elif 'Timestamp:' in line:
+                                legendLine = line.split('Timestamp:')[1:]
+                                foundLine=True
+                    if foundLine is False: legendLine = None
 
                 if params['measType'] == 'Spectrum':
-                    specPlot(refArray, len(data), params,
-                             tLine[0][tLine[0].find(':')+2:-1], axlist)
+                    specPlot(refArray, len(data), params, legendLine, axlist)
                 elif params['measType'] == 'TF':
-                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1], axlist)
+                    tfPlot(refArray, params, legendLine, axlist)
 
         if params['measType'] == 'Spectrum':
-            specPlot(dataArray, len(data), params,params['timeStamp'], axlist)
+            specPlot(dataArray, len(data), params, params['timeStamp'], axlist)
         elif params['measType'] == 'TF':
-            tfPlot(dataArray,params,params['timeStamp'], axlist)
+            tfPlot(dataArray, params, params['timeStamp'], axlist)
 
         f.set_size_inches(11,8)
-        #f.canvas.draw()
         if params['saveFig'] is True:
             f.savefig(outDir+fileRoot+'.pdf',format='pdf')
         plt.show()

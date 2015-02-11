@@ -47,7 +47,7 @@ def getdata(gpibObj, dataFile, paramFile):
     timeStamp = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
     (freq,data)=download(gpibObj)
     writeHeader(dataFile, timeStamp)
-    writeData(dataFile, freq, data)
+    writeData(dataFile, freq, data, delimiter = ', ')
 
 
 def getparam(gpibObj, fileRoot, dataFile, paramFile):
@@ -104,31 +104,30 @@ def download(gpibObj):
 
 
 def writeHeader(dataFile, timeStamp):
-    dataFile.write('# AG4395A Measurement\n')
-    dataFile.write('# Timestamp: ' + timeStamp+'\n')
+    dataFile.write('# AG4395A Measurement - Timestamp: ' + timeStamp+'\n')
 
-def writeData(dataFile,freq,data):
+def writeData(dataFile, freq, data, delimiter='    '):
     print('Writing measurement data to file...')
     #Write data vectors
     if len(freq) > 1: #Dual chan
 
         if freq[0] == freq[1]: #Shared Freq axis
             for i in range(len(freq[0])):
-                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i])
-                                + '    ' + str(data[1][i]) + '\n')
+                dataFile.write(str(freq[0][i]) + delimiter + str(data[0][i])
+                                + delimiter + str(data[1][i]) + '\n')
 
         else: #Unequal axes! Kind of awkward to output nicely
             print('Unequal Frequency Axes, stacking output')
             for i in range(len(freq[0])):
-                dataFile.write(str(freq[0][i]) + '    ' + str(data[0][i]) + '\n')
+                dataFile.write(str(freq[0][i]) + delimiter + str(data[0][i]) + '\n')
             # Print unit line?
             dataFile.write('# Channel 2 Data\n')
             for i in range(len(freq[1])):
-                dataFile.write(str(freq[1][i]) + '    ' + str(data[1][i]) + '\n')
+                dataFile.write(str(freq[1][i]) + delimiter + str(data[1][i]) + '\n')
 
     else: #Single display
         for i in range(len(freq[0])):
-            dataFile.write(str(freq[0][i])+'    '+str(data[0][i])+'\n')
+            dataFile.write(str(freq[0][i])+ delimiter +str(data[0][i])+'\n')
 
 ####################
 # Run measurements

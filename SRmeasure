@@ -27,7 +27,7 @@ def readParams(paramFile):
 def specPlot(dataArray, nDisp, params, legLabel, axlist):
     plotTitle = params.get('plotTitle','SR785 Spectrum')
     if nDisp == 2:
-        ## Switch this out if your matplotlib is too old to have plt.subplots 
+        ## Switch this out if your matplotlib is too old to have plt.subplots
         #f =plt.gcf()
         #axlist=[plt.subplot(211), plt.subplot(212)]
 
@@ -40,7 +40,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist[1].set_xlabel('Freq. (Hz)')
         axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist[0].set_title(plotTitle+' - ' + 
+        axlist[0].set_title(plotTitle+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist[0].axis('tight')
         axlist[1].axis('tight')
@@ -54,7 +54,7 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist.set_xlabel('Freq. (Hz)')
         axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist.set_yscale('log')
-        axlist.set_title(params['plotTitle']+' - ' + 
+        axlist.set_title(params['plotTitle']+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist.axis('tight')
         axlist.grid('on', which='both')
@@ -75,7 +75,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
         print 'Problem detecting units for plot... assuming dB, Degrees'
         Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
 
-    ## Switch this out if your matplotlib is too old to have plt.subplots 
+    ## Switch this out if your matplotlib is too old to have plt.subplots
     #f =plt.gcf()
     #axlist=[plt.subplot(211), plt.subplot(212)]
     axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
@@ -88,7 +88,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].set_xlabel('Freq. (Hz)')
     axlist[1].set_yscale('linear')
     axlist[1].set_ylabel('Phase (deg)')
-    axlist[0].set_title(plotTitle+' - ' + 
+    axlist[0].set_title(plotTitle+' - ' +
             time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
     axlist[0].axis('tight')
     axlist[1].axis('tight')
@@ -97,9 +97,9 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].grid('on', which='both')
     axlist[1].legend()
     axlist[1].get_legend().get_frame().set_alpha(.7)
-    
 
-def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None, 
+
+def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
          plotResult=None, plotRefs=None):
     if paramFile is None:
         # Set sensible defaults for downloading live data
@@ -120,7 +120,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         params['nameRoot'] = filename.split('.')[0]
         if '.' in filename:
             fileExt = ''.join(filename.split('.')[1:])
-    if ipAddress is not None: 
+    if ipAddress is not None:
         params['ipAddress'] = ipAddress
     if gpibAddress is not None:
         params['gpibAddress'] = gpibAddress
@@ -134,9 +134,9 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     gpibObj = inst.connectGPIB(params['ipAddress'], params['gpibAddress'])
 
     # Set up output file names
-    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime()) 
-    fileRoot = (params['nameRoot'] + '_' + 
-                time.strftime('%d-%m-%Y', time.localtime()) + 
+    params['timeStamp'] = time.strftime('%b %d %Y - %H:%M:%S', time.localtime())
+    fileRoot = (params['nameRoot'] + '_' +
+                time.strftime('%d-%m-%Y', time.localtime()) +
                 time.strftime('_%H%M%S', time.localtime()))
     dataFileName = fileRoot+fileExt
     outDir = params['saveDir'];
@@ -178,7 +178,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
     with open(outDir + dataFileName,'w') as dataFile:
         inst.writeHeader(dataFile, params['timeStamp'])
 
-        if noParam is False: dataFile.write('# Parameter File: ' 
+        if noParam is False: dataFile.write('# Parameter File: '
                                             + params['fileName']+'\n')
 
         inst.writeParams(gpibObj, dataFile)
@@ -193,9 +193,11 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
                                             np.array(data,dtype='float'))))
 
         f, axlist = plt.subplots(nrows=len(data), ncols=1, sharex=True)
+
+        # Plot references if desired
         if params['plotRefs'] is True:
             # Get list of files with the same nameRoot
-            refFiles = [ rf for rf in os.listdir(params['refDir']) 
+            refFiles = [ rf for rf in os.listdir(params['refDir'])
                          if (params['nameRoot'] in rf and '.txt' in rf and
                              rf != dataFileName)]
             print 'Found ' + str(len(refFiles)) + ' references; plotting...'
@@ -205,26 +207,33 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
             for filename in refFiles:
                 refArray = np.loadtxt(params['refDir']+filename)
 
-                # Find timestamp of Ref for the legend
+                # Find memo or timestamp of Ref for the legend
                 with open(params['refDir']+filename,'r') as rf:
-                    tLine = [line for i, line in enumerate(rf) if i==1]
+                    foundLine = True
+                    for line in rf:
+                        if foundLine is False:
+                            if 'Memo:' in line:
+                                legendLine = line.split('Memo:')[1:]
+                                foundLine=True
+                            elif 'Timestamp:' in line:
+                                legendLine = line.split('Timestamp:')[1:]
+                                foundLine=True
+                    if foundLine is False: legendLine = None
 
                 if params['measType'] == 'Spectrum':
-                    specPlot(refArray, len(data), params,
-                             tLine[0][tLine[0].find(':')+2:-1], axlist)
+                    specPlot(refArray, len(data), params, legendLine, axlist)
                 elif params['measType'] == 'TF':
-                    tfPlot(refArray,params,tLine[0][tLine[0].find(':')+2:-1], axlist)
+                    tfPlot(refArray, params, legendLine, axlist)
 
         if params['measType'] == 'Spectrum':
-            specPlot(dataArray, len(data), params,params['timeStamp'], axlist)
+            specPlot(dataArray, len(data), params, params['timeStamp'], axlist)
         elif params['measType'] == 'TF':
-            tfPlot(dataArray,params,params['timeStamp'], axlist)
+            tfPlot(dataArray, params, params['timeStamp'], axlist)
 
         f.set_size_inches(11,8)
-        #f.canvas.draw()
         if params['saveFig'] is True:
             f.savefig(outDir+fileRoot+'.pdf',format='pdf')
-        plt.show()    
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -241,7 +250,7 @@ if __name__ == "__main__":
             sys.exit(2)
 
     parser = helpfulParser()
-    group = parser.add_mutually_exclusive_group() 
+    group = parser.add_mutually_exclusive_group()
 
     group.add_argument('paramFile', nargs='?',
                        help = 'The parameter file for the measurement.',
@@ -257,7 +266,7 @@ if __name__ == "__main__":
                         'Overrides parameter file.', default = None)
 
     group.add_argument('--template', help='Copy template parameter files to'\
-                       ' current dir; no measurement is made.', 
+                       ' current dir; no measurement is made.',
                        action='store_true')
 
     group.add_argument('--reset', help='Resets an SR785, IP and GPIB address'\
@@ -276,7 +285,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--plotRefs', help='Plot reference traces. Overrides'\
                         ' parameter file. Reads files that have the same'\
-                        ' filename stem as references.',action='store_true', 
+                        ' filename stem as references.',action='store_true',
                         default = None)
 
     args = parser.parse_args()
@@ -292,7 +301,7 @@ if __name__ == "__main__":
         print 'Copying ' +TFtemplateFile+ ' to ' + os.getcwd()
         shutil.copyfile(TFtemplateFile, os.getcwd()+'/TFSR785template.yml')
         print 'Done!'
-    
+
     elif args.ipaddress is None or args.gpibaddress is None:
         parser.error('Must specify IP and GPIB addresses!\n')
 
