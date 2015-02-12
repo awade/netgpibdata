@@ -355,6 +355,7 @@ def writeParams(gpibObj, paramFile):
         fmt.append(gpibObj.query('FMT?')[:-1])
         if measType=='Spectrum':
             saUnit.append(gpibObj.query('SAUNIT?')[:-1])
+            if 'NOISE' in fmt[-1]: saUnit[-1] += '/rtHz'
         else:
             excAmp = str(float(gpibObj.query('POWE?'))) + 'dBm'
 

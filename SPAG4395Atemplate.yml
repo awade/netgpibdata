@@ -5,7 +5,7 @@ gpibAddress:  10        ## Port of GPIB device, 10 is default
 
 # Output Parameters
 saveDir:      ./        ## Path where output is saved, use [./] for current dir
-nameRoot:     SPAG4395  ## Filename root for output files
+nameRoot:     SPAG4395A ## Filename root for output files
 plotResult:   True      ## Whether to plot measured data when finished [True/False]
 plotRefs:     False     ## Whether to plot references with same nameRoot [True/False]
 refDir:       ./        ## Where the reference trace files are stored

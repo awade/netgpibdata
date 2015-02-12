@@ -233,7 +233,10 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         f.set_size_inches(11,8)
         if params['saveFig'] is True:
             f.savefig(outDir+fileRoot+'.pdf',format='pdf')
-        plt.show()
+        try:
+            plt.show()
+        except:
+            print 'Failed to show plot! X11 problem?'
 
 
 if __name__ == "__main__":
