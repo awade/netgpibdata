@@ -5,7 +5,7 @@ GPIB programs for 40m lab use
 
 SRmeasure, AGmeasure
 ---------
-These program sets up, runs, and downloads the results of measurements performed on a SR785 signal analyzer, or an AG4395A network analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by the yellow prologix boxes). In the case of the AG4395A, spectrum analyzer mode has the capability of splitting up the measurement logarithmically, to have reasonable resolution when taking spectra over a large bandwidth. 
+These program sets up, runs, and downloads the results of measurements performed on a SR785 signal analyzer, or an AG4395A network analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by the yellow prologix boxes).
 
 Ran without any arguments, the programs displays help text, detailing the available commands. These include options to:
 
