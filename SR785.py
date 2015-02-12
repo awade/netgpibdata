@@ -728,10 +728,12 @@ def setParameters(gpibObj,params):
         gpibObj.command('MEAS2,47') # Frequency Resp
         gpibObj.command('DISP0,1') # Live display on
         gpibObj.command('DISP1,1') # Live display on
-        #gpibObj.command('SSTM2,'+str(settleTime)) #Settle time
-        #gpibObj.command('SITM2,'+str(intTime)) #Integration Time
-        gpibObj.command('SSCY2,'+str(params['settleCycles'])) # Settle cycles
-        gpibObj.command('SICY2,'+str(params['intCycles'])) # Integration cycles
+        if params['integrate'].lower() == 'time':
+            gpibObj.command('SSTM2,'+str(params['settleTime'])) #Settle time
+            gpibObj.command('SITM2,'+str(params['intTime'])) #Integration Time
+        else:
+            gpibObj.command('SSCY2,'+str(params['settleCycles'])) # Settle cycles
+            gpibObj.command('SICY2,'+str(params['intCycles'])) # Integration cycles
         gpibObj.command('SSTR2,'+params['startFreq']) #Start frequency
         gpibObj.command('SSTP2,'+params['stopFreq']) #Stop frequency
         gpibObj.command('SNPS2,'+str(params['numOfPoints'])) #Number of points
