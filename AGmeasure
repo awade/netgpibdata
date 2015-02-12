@@ -283,7 +283,7 @@ if __name__ == "__main__":
                         'Overrides parameter file.', default = None)
 
     parser.add_argument('-a', '--gpibaddress',  help='GPIB address, typically'\
-                        '10. Overrides parameter file.', default = None)
+                        '10. Overrides parameter file.', default = 10)
 
     parser.add_argument('-f', '--filename',  help='Stem of output filename.'\
                         'Overrides parameter file.', default = None)
