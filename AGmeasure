@@ -25,19 +25,27 @@ def readParams(paramFile):
 
 def specPlot(dataArray, nDisp, params, legLabel, axlist):
     plotTitle = params.get('plotTitle','AG4395A Spectrum')
-    if nDisp == 2:
-        ## Switch this out if your matplotlib is too old to have plt.subplots
-        #f =plt.gcf()
-        #axlist=[plt.subplot(211), plt.subplot(212)]
+    plotScales = params.get('plotScales',None)
 
+    if plotScales is None:
+        if 'db' in params['dataMode'].lower():
+            xScale='linear'
+            yScale='linear'
+        else:
+            xScale='log'
+            yScale='log'
+    else:
+        (xScale, yScale) = plotScales.split(',')
+
+    if nDisp == 2:
         axlist[0].plot(dataArray[:,0],dataArray[:,1],label=legLabel+" (Ch1)")
         axlist[1].plot(dataArray[:,0],dataArray[:,2],label=legLabel+" (Ch2)")
-        axlist[0].set_xscale('log')
+        axlist[0].set_xscale(xScale)
+        axlist[0].set_yscale(yScale)
         axlist[0].set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist[0].set_yscale('log')
-        axlist[1].set_xscale('log')
+        axlist[1].set_xscale(xScale)
+        axlist[1].set_yscale(yScale)
         axlist[1].set_xlabel('Freq. (Hz)')
-        axlist[1].set_yscale('log')
         axlist[1].set_ylabel('Magnitude ('+params['dataMode']+')')
         axlist[0].set_title(plotTitle+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
@@ -49,11 +57,11 @@ def specPlot(dataArray, nDisp, params, legLabel, axlist):
         axlist[0].get_legend().get_frame().set_alpha(.7)
     else:
         axlist.plot(dataArray[:,0],dataArray[:,1],label=legLabel)
-        axlist.set_xscale('log')
+        axlist.set_xscale(xScale)
+        axlist.set_yscale(yScale)
         axlist.set_xlabel('Freq. (Hz)')
         axlist.set_ylabel('Magnitude ('+params['dataMode']+')')
-        axlist.set_yscale('log')
-        axlist.set_title(params['plotTitle']+' - ' +
+        axlist.set_title(plotTitle+' - ' +
                 time.strftime('%b %d %Y - %H:%M:%S', time.localtime()))
         axlist.axis('tight')
         axlist.grid('on', which='both')
@@ -74,9 +82,6 @@ def tfPlot(dataArray,params, legLabel, axlist):
         print 'Problem detecting units for plot... assuming dB, Degrees'
         Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
 
-    ## Switch this out if your matplotlib is too old to have plt.subplots
-    #f =plt.gcf()
-    #axlist=[plt.subplot(211), plt.subplot(212)]
     axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
     axlist[1].plot(dataArray[:,0],np.angle(Carray, deg=True),label=legLabel)
 
@@ -108,7 +113,6 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         params['saveDir'] = os.getcwd()+'/'
         params['plotRefs'] = False
         params['plotResult'] = False
-        params['nSegment'] = 1
         params['averages'] = 1
     else:
         noParam = False
@@ -147,42 +151,43 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         print 'Executing measurement specified in '+paramFile
         inst.setParameters(gpibObj,params)
         inst.measure(gpibObj,params)
-
     else: # What kind of measurement are we doing?
         params['measType']={1: 'TF', 0: 'Spectrum'}[int(gpibObj.query('NA?'))]
-        nDisp = int(gpibObj.query('DUAC?')) +1
-        if nDisp == 1:
-            chans=[int(gpibObj.query('CHAN2?'))+1]
+
+    nDisp = int(gpibObj.query('DUAC?')) +1
+    if nDisp == 1:
+        chans=[int(gpibObj.query('CHAN2?'))+1]
+    else:
+        chans=[1,2]
+
+    meas=[]
+    fmt=[]
+    for chan in chans:
+        gpibObj.command('CHAN'+str(chan))
+        # What measurement?
+        meas.append(gpibObj.query('MEAS?')[:-1])
+        fmt.append(gpibObj.query('FMT?')[:-1])
+
+    if params['measType']=='Spectrum':
+        # Doesn't handle channels being in different units...
+        params['dataMode']=(gpibObj.query('SAUNIT?')[:-1])
+        if 'NOISE' in fmt: params['dataMode'] += '/rtHz'
+
+    elif params['measType']=='TF':
+        # What if channel 1 and 2 are swapped from the expected placement?
+        if fmt==['LOGM','PHAS']:
+            params['dataMode']='dbdeg'
+        elif fmt==['LINM','PHAS']:
+            params['dataMode']='magdeg'
+        elif fmt==['REAL','IMAG']:
+            params['dataMode']='reim'
         else:
-            chans=[1,2]
+            params['dataMode']=str(fmt)
+            if params['plotResult'] is True:
+                print "No plot routined exists for data format, will skip plotting"
+                params['plotResult']=False
 
-        meas=[]
-        fmt=[]
-        for chan in chans:
-            gpibObj.command('CHAN'+str(chan))
-            # What measurement?
-            meas.append(gpibObj.query('MEAS?')[:-1])
-            fmt.append(gpibObj.query('FMT?')[:-1])
-
-        if params['measType']=='Spectrum':
-            # Doesn't handle channels being in different units...
-            params['dataMode']=(gpibObj.query('SAUNIT?')[:-1])
-
-        elif params['measType']=='TF':
-            # What if channel 1 and 2 are swapped from the expected placement?
-            if fmt==['LOGM','PHAS']:
-                params['dataMode']='dbdeg'
-            elif fmt==['LINM','PHAS']:
-                params['dataMode']='magdeg'
-            elif fmt==['REAL','IMAG']:
-                params['dataMode']='reim'
-            else:
-                params['dataMode']=str(fmt)
-                if params['plotResult'] is True:
-                    print "No plot routined exists for data format, will skip plotting"
-                    params['plotResult']=False
-
-        print 'Detected Units: '+params['dataMode']
+    print 'Detected Units: '+params['dataMode']
 
 
     # Let the instrument catch up, then download the data
@@ -258,8 +263,8 @@ if __name__ == "__main__":
 
     # Set location of template files, should live with the script
     scriptPath = os.path.dirname(os.path.realpath(__file__))
-    SPtemplateFile = scriptPath + '/SPAG4395template.yml'
-    TFtemplateFile = scriptPath + '/TFAG4395template.yml'
+    SPtemplateFile = scriptPath + '/SPAG4395Atemplate.yml'
+    TFtemplateFile = scriptPath + '/TFAG4395Atemplate.yml'
 
     class helpfulParser(argparse.ArgumentParser):
         def error(self, message):
