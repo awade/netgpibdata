@@ -1,0 +1,541 @@
+#!/usr/bin/env python
+
+# this module allows setting of simple scan parameters over GPIB for netowrk analyzer 
+# The parameters are to be set in a yml file
+# Nichin Sreekantaswamy: June-July 2014
+
+
+import math
+import datetime
+import optparse
+import netgpib
+import time
+import os
+import sys
+import matplotlib.pyplot as plt
+import numpy as np
+import yaml
+import argparse
+import re
+import matplotlib
+
+def getdata(gpibObj, dataFile, paramFile):
+
+	#Put the analyzer on hold
+	gpibObj.command("HOLD")
+	time.sleep(0.1)
+
+	#Get the number of data points
+	numPoints = int(gpibObj.query("POIN?"))
+
+	#Set the output format to ASCII
+	gpibObj.command("FORM4")
+    
+	# It is the network analyzer mode    
+	# In this mode, the data format is real,imag for each frequency point
+
+	#Get the frequency points
+	print('Reading frequency points.')
+	receivedData=gpibObj.query("OUTPSWPRM?",1024)
+
+	# Parse data
+	# Matching to the second column of dumpedData
+	freqList=re.findall(r'[-+.E0-9]+', receivedData, re.M)
+
+	# Get the data
+	print('Reading data.')
+	receivedData=gpibObj.query("OUTPDATA?",1024)
+
+	# Break the data into lists
+	dataList = re.findall(r'[-+.E0-9]+',receivedData)
+
+	# Output data
+	print('Writing the data into file.')
+
+	j=0;
+	for i in range(len(freqList)):
+	    dataFile.write(freqList[i]+', '+dataList[j]+', '+ dataList[j+1]+'\n')
+	    j=j+2;
+  	
+	gpibObj.command( "CONT\n") 
+     
+def getparam(gpibObj, filename, dataFile, paramFile):
+    #Get measurement parameters
+    
+    print('Reading measurement parameters')
+    
+    #pdb.set_trace()
+    #Check the analyzer mode
+    analyzerMode = int(gpibObj.query("NA?"))
+    analyzerType={1: 'Network Analyzer', 0: 'Spectrum Analyzer'}[analyzerMode]
+
+    #Determine labels and units
+    Label=[]
+    Unit=[]
+    if analyzerMode == 1: # Network analyzer mode
+        Label.append('Real Part')
+        Label.append('Imaginary Part')
+        Unit.append('')
+        Unit.append('')
+        numOfChan = 2
+    else:  # Spectrum analyzer mode
+        numOfChan = int(gpibObj.query("DUAC?")) +1
+        for i in range(numOfChan):
+            Label.append('Spectrum')
+            Unit.append('W')
+
+    #Get the current channel number
+    ans=int(gpibObj.query("CHAN1?"))
+    if ans ==1:
+        currentChannel=1
+    else:
+        currentChannel=2
+
+    BW=[]
+    BWAuto=[]
+    MEAS=[]
+    for i in range(numOfChan):
+
+        #ch stores the current channel number
+        if numOfChan == 1:
+            ch=currentChannel
+        else:
+            ch=i+1
+                
+        #Change the active channel to ch
+        gpibObj.command( "CHAN"+str(ch))
+        time.sleep(1)
+
+    # Get bandwidth information
+                  
+        buf=gpibObj.query("BW?")
+        BW.append(buf[:-1])
+
+        j=int(gpibObj.query("BWAUTO?"))
+        BWAuto.append({0: 'Off', 1: 'On'}[j])
+
+    # Measurement Type
+        gpibObj.command('CHAN'+str(i+1))
+        buf=gpibObj.query("MEAS?")
+        MEAS.append(buf[:-1])
+
+    # Get attenuator information
+    AttnR = str(int(gpibObj.query("ATTR?")))+'dB'
+    AttnA = str(int(gpibObj.query("ATTA?")))+'dB'
+    AttnB = str(int(gpibObj.query("ATTB?")))+'dB'
+    
+    # Source power
+    buf = gpibObj.query("POWE?")
+    SPW = buf[:-1]+'dBm'
+        
+    # Write to the parameter file
+    # Header
+    paramFile.write('Agilent 4395A parameter file\nThis file contains measurement parameters for the data saved in '
+                    +filename+'.dat\n')
+    # For the ease of getting necessary information for plotting the data, several numbers 
+    # and strings are put first.
+    # The format is the number of channels comes first, then the title of the channels and 
+    # the units follow, one per line.
+    #     paramFile.write('#The following lines are for a matlab plotting function\n')
+    #     paramFile.write(str(numOfChan)+'\n')
+
+    paramFile.write('Data format: Freq')
+    for i in range(numOfChan):
+         paramFile.write(', '+Label[i])
+         paramFile.write('('+Unit[i]+')')
+
+    paramFile.write('\n')
+
+    paramFile.write('##################### Measurement Parameters #############################\n')
+    paramFile.write('Analyzer Type: '+analyzerType+'\n')
+    for i in range(numOfChan):
+        #ch stores the current channel number
+        if numOfChan == 1:
+            ch=currentChannel
+        else:
+            ch=i+1
+
+        paramFile.write('CH'+str(ch)+' measurement: '+MEAS[i]+'\n')
+    
+    for i in range(numOfChan):
+        paramFile.write('CH'+str(ch)+' bandwidth: '+BW[i]+'\n')
+        paramFile.write('CH'+str(ch)+' auto bandwidth: '+BWAuto[i]+'\n')
+    
+    paramFile.write('R attenuator: '+AttnR+'\n')
+    paramFile.write('A attenuator: '+AttnA+'\n')
+    paramFile.write('B attenuator: '+AttnB+'\n')
+
+    paramFile.write('Source power: '+SPW+'\n')                     
+
+#==========================================================================================
+#BEGIN CORE FUNCTION
+#==========================================================================================
+
+
+def RunAG4395Scan(StartFreq,StopFreq,FileStem,Averages,Directory,options,verbosity=2):    
+    #The parameters passed individually are selected either from the cl inputs or from the batch file
+    #any additional options will just be read in from the command line and parsed internally 
+    device_name='AG4395A'
+    #ipAddress='crocetta.martian'
+    #gpibAddress = 10
+    
+    # # Open socket
+    print('Connecting to '+str(options.ipAddress))
+
+     #Create a netGPIB object
+    gpibObj = netgpib.netGPIB(options.ipAddress, options.gpibAddress, '\004',0)
+    time.sleep(0.1)
+    
+    print('Connected!')
+    gpibObj.command('DUAC OFF') # dual channel OFF
+    time.sleep(0.1)
+    
+
+
+
+    gpibObj.command('CHAN1') # Channel 1 settings
+    time.sleep(0.1)
+
+    gpibObj.command('NA') # network analyzer mode
+    time.sleep(0.1)
+    if options.mode == 'BR':
+        gpibObj.command('MEAS BR') # measure mode (A/R, B/R, A/B)
+	print('Measurement mode: B/R')
+    elif options.mode == 'AB':
+        gpibObj.command('MEAS AB') # measure mode (A/R, B/R, A/B)
+	print('Measurement mode: A/B')
+    else: 
+	gpibObj.command('MEAS AR') # measure mode (A/R, B/R, A/B)
+	print('Measurement mode: A/R')
+    time.sleep(0.1)
+
+
+
+    
+    gpibObj.command('SWETAUTO') # auto sweep time
+    time.sleep(0.1)
+    if options.sweepType == 'Linear':
+        gpibObj.command('SWPT LINF') # sweep lin freq.
+    else:
+        gpibObj.command('SWPT LOGF') # sweep log freq.
+    time.sleep(0.1)
+    gpibObj.command('BW '+str(options.ifbandw))      #to set the IF bandwidth
+    time.sleep(0.1)
+
+    #parse source power to make it machine readable
+
+    if len(options.excAmp)>1:
+        for iX in range(1,len(options.excAmp)): # start at 1 b/c 1st digit might be a '-'
+            # & we don't need to check it
+            if options.excAmp[iX].isdigit()==0:
+                xVal = float(options.excAmp[:iX])
+                if options.excAmp[iX]=='m':
+                    mult = 0.001
+                elif options.excAmp[iX]=='u':
+                    mult = 0.000001
+                else:
+                    mult = 1
+                    break
+            if iX == len(options.excAmp)-1:
+                xVal = float(options.excAmp)
+    else:
+        xVal = float(options.excAmp[0])
+        
+    if options.excAmp.find("V") != -1:
+        voltVal = xVal*mult # value in Volts
+        dBmVal = 20*math.log(voltVal/0.001,10)
+        
+    else:
+        if verbosity>0:
+            print('Using dBm as amplitude units')
+        dBmVal = xVal
+        
+    gpibObj.command('POWE '+str(dBmVal)) # units are in dBm
+    time.sleep(0.1)  
+   
+    gpibObj.command('TRGS INT') # get triggering from internal 
+
+    #parse the start and stop frequencies into machine readable integers
+    if verbosity==2:
+        print('parsing')
+
+    for i in range(2):
+        tmp = ""
+        val = 0
+        mult = 0
+
+        if i==0:
+            tmp = StartFreq
+        else:
+            tmp = StopFreq
+        
+        Hindex = tmp.find("Hz")
+        if Hindex == -1:
+            mult=1
+            val = float(tmp)
+        elif tmp[Hindex-1].isdigit():
+            mult=1
+            val = float(tmp[0:Hindex])
+        else:
+            val = float(tmp[0:Hindex-1])
+            if tmp[Hindex-1]=='k' or tmp[Hindex-1]=='K':
+                mult=1000
+            elif tmp[Hindex-1]=='M':
+                mult=1000*1000
+            elif tmp[Hindex-1]=='G':
+                mult=1000*1000*1000
+            elif tmp[Hindex-1]=='m':
+                mult =0.001
+            elif tmp[Hindex-1]=='u':
+                mult=0.000001
+            else:
+                print('error, cannot understand: '+tmp[Hindex-1:])
+        if i==0:
+            startFval = int(val*mult)
+        else:
+            stopFval = int(val*mult)
+        
+
+    #Sanity Check the inputs
+    if startFval>stopFval:
+        tmp = stopFval
+        stopFval = startFval
+        startFval=tmp
+    
+
+    #checking that the directory specified in -d exists, and creating if not
+    if os.access(Directory,os.F_OK)==0:
+        os.mkdir(Directory)
+
+    if verbosity>0:
+        print('\033[31m')
+        print('Scanning from: '+str(startFval)+' Hz to: '+str(stopFval)+' Hz ')
+        print('\033[0m')
+    if 1:
+        ## initialize setup
+       #Sanitize averaging input
+        if Averages<1:
+            averages = 1
+        else:
+            averages = Averages
+
+        #Sanitize settling time input
+        if options.settle<1:
+            settlingTime = 1
+        else:
+            settlingTime = options.settle
+
+        #Sanitize Number of Point input
+        if options.numOfPoints >801:
+            nPoints = 801
+        elif options.numOfPoints<1:
+            nPoints =1
+        else:
+            nPoints = options.numOfPoints
+
+
+	gpibObj.command('CHAN1') # choose the active channel
+    	time.sleep(0.1)
+	print('Setting channel 1 params')
+	time.sleep(0.1)
+	gpibObj.command('FMT LINM') # choose the formats in each channel
+	time.sleep(0.1)  
+        gpibObj.command('AVER ON') # average ON
+        time.sleep(0.1)
+        gpibObj.command('AVERFACT '+str(averages)) #setup averaging as necessary
+        time.sleep(0.1)
+        gpibObj.command('POIN '+str(nPoints)) # number of points, max=801
+        time.sleep(0.1)
+		
+ 
+    	#Opening data (.dat) and parameter (.par) file
+    	dataFileName=options.dir+'/'+options.fileStem+'.dat' 
+    	paramFileName=options.dir+'/'+options.fileStem+'.par'
+    	dataFile = open(dataFileName,'w')
+    	paramFile = open(paramFileName,'w')
+
+        
+        if verbosity>0:
+        	print('\033[37m')
+                print('-----------------------------------')
+                print('Sweeping from '+str(startFval)+' Hz to '+str(stopFval)+' Hz')
+                print('\033[0m')
+
+        gpibObj.command('STAR '+str(startFval)) # set the start frequency
+        time.sleep(0.1)
+        gpibObj.command('STOP '+str(stopFval)) # set the stop frequency
+        time.sleep(0.1)
+        gpibObj.command('NUMG '+str(averages+settlingTime+2))     # Number of groups must be >= averaging factor
+        time.sleep(0.1)
+        gpibObj.command('*TRG') # triggers the measurement to start
+
+        gpibObj.query('HOLD?')  # flushes the HOLD? buffer so that the wait will read correctly
+        time.sleep(1)           # ensures we don't read the buffer too quickly 
+        while gpibObj.query('HOLD?')!='1\n': # waits until the current measurement is done
+        	time.sleep(0.5)                  # the NA will enter HOLD mode (1) when the sweep has finished
+
+
+
+        #getting data
+        if not verbosity==2: # suppress all the dialog from getdata and getparam if desired
+                saveout=sys.stdout
+                dnull = open('/dev/null','w') 	# this is pretty hacky, but I guess I am not supposed to touch
+                sys.stdout=dnull 		# any of the original netgpib files
+            
+        print('Acquiring...')  
+        getdata(gpibObj, dataFile, paramFile)
+        getparam(gpibObj, paramFileName, dataFile, paramFile)
+    
+  
+        if not verbosity==2:
+                sys.stdout=saveout
+                dnull.close()
+        dataFile.close()
+        paramFile.close()
+    print('Data acquired!')
+
+    gpibObj.close()
+
+
+#==========================================================================================
+#END CORE FUNCTION
+#==========================================================================================
+
+
+#Usage text
+usage = """usage: %prog [options]
+
+This command will run a scan on the AG4395 Network Analyzer and download the result as a .dat files. It also give the bode plots. Enter all your parameters in the .yml file... follow the NWAG4395A_parameters.yml, including the place where you want your plots to be saved.
+"""
+
+def readParams(paramFile):
+    with open(paramFile,'r') as f:
+        reader = yaml.load_all(f)
+        params = reader.next()
+        reader.close()
+    return(params)
+
+class optionsclass:
+	pass
+
+def plotstuff(dataFileName,tofig,outDir,fileRoot,title):
+	matplotlib.rc('xtick',labelsize =17)
+	matplotlib.rc('ytick',labelsize =17)
+	data = np.loadtxt (dataFileName,float,delimiter=',',usecols=(0,1,2),ndmin=2) 
+	freq = data[:,0]
+	real = data[:,1]
+	imag = data[:,2]
+	cmplxdata = real + 1j*imag
+	
+	LM_data = np.absolute(cmplxdata)
+	PH_data = np.angle(cmplxdata, deg=True)
+
+	
+	plotdata1 = 20*(np.log10(LM_data))
+	plotdata2 = PH_data
+
+	plt.subplot(2,1,1)
+	a1= plt.semilogx(freq,plotdata1)
+	plt.setp(a1, color = 'r')
+	plt.title(title,fontsize =24)
+	plt.ylabel ('Magnitude [dB]',fontsize=24)
+	plt.xlabel ('Frequency [Hz]',fontsize=24)
+	plt.grid()
+
+	plt.subplot(2,1,2)
+	plt.semilogx(freq,plotdata2)
+	plt.ylabel ('Phase[deg]',fontsize=24)
+	plt.xlabel ('Frequency [Hz]',fontsize=24)
+	plt.grid()
+
+	plt.tight_layout(pad=0.4,h_pad=0.1,w_pad=0.1)
+
+
+	print('Done plotting')
+
+	if tofig is True:
+            plt.savefig(outDir+'/'+fileRoot+'.pdf',format='pdf')
+	
+
+	plt.show()
+	
+def version_cmp(version1, version2):
+   	parts1 = [int(x) for x in version1.split('.')]
+	parts2 = [int(x) for x in version2.split('.')]
+
+	# fill up the shorter version with zeros ...
+	lendiff = len(parts1) - len(parts2)
+	if lendiff > 0:
+	        parts2.extend([0] * lendiff)
+	elif lendiff < 0:
+	        parts1.extend([0] * (-lendiff))
+
+	for i, p in enumerate(parts1):
+	        ret = cmp(p, parts2[i])
+        	if ret: return ret
+    	return 0
+
+def main(NWAG4395A_paramFile):
+	print('Reading parameters from '+NWAG4395A_paramFile)
+	params=readParams(NWAG4395A_paramFile)
+	
+	options = optionsclass()
+	
+	options.fileStem = (params['nameRoot'] + '_' + 
+                time.strftime('%d-%m-%Y', time.localtime()) + 
+                time.strftime('_%H%M%S', time.localtime()))
+	options.dir =( params['saveDir'] + '_' + 
+                time.strftime('%d-%m-%Y', time.localtime()) + 
+                time.strftime('_%H%M%S', time.localtime()))
+	
+	options.startF = params['startFreq']
+	options.endF = params['stopFreq']
+	options.aver = int(params['averages'])
+	options.mode = params['mode']
+	options.ipAddress = params['ipAddress']
+	options.gpibAddress = int(params['gpibAddress'])
+	options.numOfPoints = int(params['numOfPoints'])
+	options.sweepType = params['sweepType']
+	options.excAmp = params['excAmp']
+	options.settle = int(params['settleTime'])
+	options.ifbandw = params['ifbandwidth'] 
+
+	RunAG4395Scan(options.startF,options.endF,options.fileStem,options.aver,options.dir,options)
+
+
+ 
+    	if params['plotResult'] is True:
+		vercmp = version_cmp('1.6.0',np.__version__)
+		if vercmp == 1:
+			print'numpy version is not compatible with data plotting code'
+        		
+		else:
+			print 'Plotting'
+        		dataFileName=options.dir+'/'+options.fileStem+'.dat' 
+			plotstuff(dataFileName,params['saveFig'],options.dir,options.fileStem,params['plotTitle'])
+	
+	
+
+if __name__ == "__main__":
+    templateFile = '/opt/rtcds/caltech/c1/scripts/general/' \
+                   'netgpibdata/NWAG4395A_parameters.yml' 
+    parser = argparse.ArgumentParser() 
+    parser.add_argument('paramFile', nargs='?',
+                        help = 'The Parameter file for the measurement.' \
+                               ' If not specified, uses the template parameter'\
+                               ' file in scripts/general/netgpibdata/NWAG4395A_parameters.yml',
+                        default=templateFile)
+    parser.add_argument('--template', help='Copy template parameter file to'\
+                                           ' current dir, no measurement is'\
+                                           ' made.',
+                        action='store_true')
+    args = parser.parse_args()
+    if args.template:
+        import shutil
+        print 'Copying ' +templateFile+ ' to ' + os.getcwd()
+        shutil.copyfile(templateFile, os.getcwd()+'/NWAG4395A_parameters.yml')
+        print 'Done!'
+    else:    
+        main(args.paramFile)
+
+
