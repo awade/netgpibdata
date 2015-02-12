@@ -1,26 +1,25 @@
 # Analyzer Details
 deviceName:   AG4395A 
-ipAddress:    crocetta          ## Ip or hostname of GPIB Device
-gpibAddress:  10                ## port of GPIB device (10) is default 
+ipAddress:    vanna     ## IP or hostname of GPIB Device
+gpibAddress:  10        ## Port of GPIB device, 10 is default 
 
 # Output Parameters
-saveDir:      ./                ## Path where output is saved, use './' for current dir
-nameRoot:     SPAG4395         ## Filename root for output files
-plotResult:   True              ## Whether to plot measured data when finished [True/Flase]
-plotRefs:     False
-plotScales:   Log,Log           ## Scaling of x and y axes, respectively. Format: [Lin/Log],[Lin/Log]
-saveFig:      False              ## If plotResult is true, saves a pdf with same filename [True/Flase]
+saveDir:      ./        ## Path where output is saved, use [./] for current dir
+nameRoot:     SPAG4395  ## Filename root for output files
+plotResult:   True      ## Whether to plot measured data when finished [True/False]
+plotRefs:     False     ## Whether to plot references with same nameRoot [True/False]
+refDir:       ./        ## Where the reference trace files are stored
+plotScales:   Log,Log   ## Scaling of x and y axes, respectively. [Linear,Log],[Log,Log], etc.
+saveFig:      False     ## If plotResult is true, saves a pdf with same filename [True/False]
 plotTitle:    AG4395A Spectrum Measurement
 
 # Measurement Parameters
 measType:     Spectrum          
-startFreq:    100Hz             ## Start frequency
-stopFreq:     1MHz            ## Stop frequency, 300MHz max
-nSegment:     4                 ## Number of segments to logarithmically split measurement into
-                                ## (I.e. pseudo-log sweep)
-specType:     Noise             ## "Noise" (i.e. PSD units) or "Spectrum" (power units)
-dualChannel:  Single            ## "Single"/"Dual"
-channels:     A                 ## "R", "A", "B" for single channel. "RA","AB", etc. for dual
-attenuation:  0                ## dB of input attenuation, i.e. 40, or 'auto' 
-averages:     5                 ## Number of averages (1=no averaging)
-bwSpanRatio: 1.0                ## Set resolution bandwidth / span ratio, in percent. 0.01 to 10
+startFreq:    100Hz     ## Start frequency
+stopFreq:     1MHz      ## Stop frequency, 300MHz max
+specType:     Noise     ## [Noise] (i.e. PSD units) or [Spectrum] (power units)
+dualChannel:  Single    ## [ Single ]/[ Dual ]
+channels:     A         ## [R], [A], [B] for single channel. [RA],[AB], etc. for dual
+attenuation:  0         ## dB of input attenuation, i.e. [40], or [auto]
+averages:     5         ## Number of averages 
+bwSpanRatio:  1.0       ## Set resolution bandwidth / span ratio, in percent. [0.01] to [10]
