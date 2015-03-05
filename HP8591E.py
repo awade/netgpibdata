@@ -30,12 +30,42 @@ def connectGPIB(ipAddress,gpibAddress):
 def reset(gpibObj):
     print('Resetting HP8591E...')
     gpibObj.command('IP')
-    gpibObj.command('FA 0')
+    gpibObj.command('FA 0MHz')
     gpibObj.command('FB 250MHz')
     gpibObj.command('CONTS')
     gpibObj.command('RB 300kHz')
     print('Done!')
 
+def peakZoom(gpibObj):
+    print('Zooming to Min 5kHz Span. Peak must be above 10MHz!')
+    gpibObj.command('FA 10MHz')
+    gpibObj.command('RB AUTO')
+    gpibObj.command('VAVG 5')
+    gpibObj.command('VB AUTO')
+    gpibObj.command('RQS 4')
+    span = float(gpibObj.query('SPAN?')[:-2])
+    while span >= 5000.0:
+
+        gpibObj.command('CONTS;SNGLS')
+        gpibObj.command('CLS')
+        gpibObj.command('CLRAVG') # Doesn't work?
+        gpibObj.command('TS')
+
+        while not int(gpibObj.srq()):
+            time.sleep(1)
+
+        gpibObj.command('MKPK HI')
+        peakF = gpibObj.query('MKF?')[:-2]
+        gpibObj.command('CF '+peakF)
+        span =min([span/2.0, (float(peakF)-float(gpibObj.query('FA?')))/2.0])
+        gpibObj.command('SPAN '+str(span))
+        span = float(gpibObj.query('SPAN?')[:-2])
+        time.sleep(1)
+
+    print('Done!')
+    gpibObj.command('VAVG 25')
+        
+        
 
 ####################
 # Compatibility with old netgpibdata script
@@ -98,9 +128,9 @@ def measure(gpibObj, params):
     print('Triggering measurement!')
     # Clear status bits, only ask for sweep end events
     gpibObj.command('RQS 4')
+    gpibObj.command('CONTS;SNGLS')
     gpibObj.command('CLS')
     gpibObj.command('CLRAVG') # Doesn't work?
-    gpibObj.command('CONTS;SNGLS')
     gpibObj.command('TS')
 
     while not int(gpibObj.srq()):

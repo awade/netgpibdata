@@ -209,6 +209,9 @@ if __name__ == "__main__":
                        ' IP and GPIB address are required.',
                        action='store_true')
 
+    group.add_argument('--peak', help='Zoom span to a peak above 10MHz',
+                       action='store_true')
+
     group.add_argument('--trigger', help='Trigger a single sweep of the '
                        'currently configured measurement. IP and GPIB address '
                        'are required.', action='store_true')
@@ -248,4 +251,9 @@ if __name__ == "__main__":
     elif args.trigger:
         gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
         gpibObj.command('CONTS;SNGLS')
+        gpibObj.close()
+
+    elif args.peak:
+        gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
+        inst.peakZoom(gpibObj)
         gpibObj.close()
