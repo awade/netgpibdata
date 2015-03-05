@@ -3,9 +3,9 @@ netgpibdata
 
 GPIB programs for 40m lab use
 
-SRmeasure, AGmeasure
+SRmeasure, AGmeasure, HPmeasure
 ---------
-These program sets up, runs, and downloads the results of measurements performed on a SR785 signal analyzer, or an AG4395A network analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by the yellow prologix boxes).
+These program set up, run, and download the results of measurements performed on a SR785 signal analyzer, AG4395A network analyzer, or HP8591E spectrum analyzer, presuming some kind of ethernet to GPIB communication capability (such as is provided by our yellow prologix boxes).
 
 Ran without any arguments, the programs displays help text, detailing the available commands. These include options to:
 

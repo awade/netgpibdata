@@ -209,16 +209,16 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
 
                 # Find memo or timestamp of Ref for the legend
                 with open(params['refDir']+filename,'r') as rf:
-                    foundLine = True
+                    foundLine = False
                     for line in rf:
                         if foundLine is False:
                             if 'Memo:' in line:
-                                legendLine = line.split('Memo:')[1:]
+                                legendLine = ''.join(line.split('Memo:')[1:])
                                 foundLine=True
                             elif 'Timestamp:' in line:
-                                legendLine = line.split('Timestamp:')[1:]
+                                legendLine = ''.join(line.split('Timestamp:')[1:])
                                 foundLine=True
-                    if foundLine is False: legendLine = None
+                    if foundLine is False: legendLine = filename
 
                 if params['measType'] == 'Spectrum':
                     specPlot(refArray, len(data), params, legendLine, axlist)

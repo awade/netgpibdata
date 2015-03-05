@@ -28,10 +28,12 @@ def connectGPIB(ipAddress,gpibAddress):
 ####################
 
 def reset(gpibObj):
-    # Call reset command, manual states it takes 12 sec to finish
     print('Resetting HP8591E...')
-    gpibObj.command("IP")
-    time.sleep(2)
+    gpibObj.command('IP')
+    gpibObj.command('FA 0')
+    gpibObj.command('FB 250MHz')
+    gpibObj.command('CONTS')
+    gpibObj.command('RB 300kHz')
     print('Done!')
 
 
