@@ -87,18 +87,18 @@ def getparam(gpibObj, fileRoot, dataFile, paramFile):
 def download(gpibObj):
     data=list()
     freq=list()
-    if gpibObj.query('DFMT?')[0] != 0: # Dual channel, or overlay
+    if gpibObj.query('DFMT?')[0] != '0': # Dual channel, or overlay
         for disp in range(2):
             print('Downloading data from display #'+str(disp))
             (f,d)=downloadDisplay(gpibObj, disp)
-            freq.append(f)
-            data.append(d)
+            freq.append(f[:-1])
+            data.append(d[:-1])
     else:
         active = int(gpibObj.query('ACTD?')[0])
         print('Downloading data from display #'+str(active))
         (f,d)=downloadDisplay(gpibObj, active)
-        freq.append(f)
-        data.append(d)
+        freq.append(f[:-1])
+        data.append(d[:-1])
 
     return(freq, data)
 
@@ -220,7 +220,7 @@ def writeParams(gpibObj, paramFile):
     print('Reading instrument parameters')
 
     #Get the display format
-    if int(gpibObj.query("DFMT?")) != 0:
+    if int(gpibObj.query("DFMT?")) != '0':
         dispList = range(2)
     else:
         dispList = [int(gpibObj.query('ACTD?')[0])]
@@ -560,7 +560,7 @@ def setParameters(gpibObj,params):
         else:
             fRes=3 # Resolution is 800 points
 
-        if params['dualChannel'] == "Dual":
+        if params['dualChannel'].lower() == "dual":
             gpibObj.command('DFMT1') # Dual display
             numDisp=2
         else:
