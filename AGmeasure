@@ -82,7 +82,7 @@ def tfPlot(dataArray,params, legLabel, axlist):
         print 'Problem detecting units for plot... assuming dB, Degrees'
         Carray = 10**(dataArray[:,1]/20.0)*np.exp(1j*dataArray[:,2]/180.0*np.pi)
 
-    axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)))
+    axlist[0].plot(dataArray[:,0],20*np.log10(np.abs(Carray)),label=legLabel)
     axlist[1].plot(dataArray[:,0],np.angle(Carray, deg=True),label=legLabel)
 
     axlist[0].set_xscale('log')
@@ -99,12 +99,12 @@ def tfPlot(dataArray,params, legLabel, axlist):
     axlist[1].set_ylim((-180,180))
     axlist[0].grid('on', which='both')
     axlist[1].grid('on', which='both')
-    axlist[1].legend()
+    axlist[1].legend(loc=2)
     axlist[1].get_legend().get_frame().set_alpha(.7)
 
 
 def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
-         plotResult=None, plotRefs=None):
+         plotResult=None, plotRefs=None, leglabel=None):
     if paramFile is None:
         # Set sensible defaults for downloading live data
         noParam = True
@@ -248,10 +248,12 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
                 elif params['measType'] == 'TF':
                     tfPlot(refArray, params, legendLine, axlist)
 
+        if leglabel is None: 
+            leglabel = params['timeStamp']
         if params['measType'] == 'Spectrum':
-            specPlot(dataArray, len(data), params, params['timeStamp'], axlist)
+            specPlot(dataArray, len(data), params, leglabel, axlist)
         elif params['measType'] == 'TF':
-            tfPlot(dataArray, params, params['timeStamp'], axlist)
+            tfPlot(dataArray, params, leglabel, axlist)
 
         f.set_size_inches(11,8)
         if params['saveFig'] is True:
@@ -291,6 +293,9 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--filename',  help='Stem of output filename.'\
                         'Overrides parameter file.', default = None)
 
+    parser.add_argument('-l', '--leglabel',  help='Legend label for measured'\
+                        'trace. Overrides parameter file.', default = None)
+
     group.add_argument('--template', help='Copy template parameter files to'\
                        ' current dir; no measurement is made.',
                        action='store_true')
@@ -321,7 +326,7 @@ if __name__ == "__main__":
 
     if args.paramFile is not None:
         main(args.paramFile, args.filename, args.ipaddress, args.gpibaddress,
-             args.plot, args.plotRefs)
+             args.plot, args.plotRefs, args.leglabel)
 
     elif args.template:
         import shutil
@@ -336,7 +341,7 @@ if __name__ == "__main__":
 
     elif args.getdata:
         main(None, args.filename, args.ipaddress, args.gpibaddress,
-             args.plot, args.plotRefs)
+             args.plot, args.plotRefs, args.leglabel)
 
     elif args.reset:
         gpibObj = inst.connectGPIB(args.ipaddress, args.gpibaddress)
