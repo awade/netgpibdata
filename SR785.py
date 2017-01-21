@@ -21,8 +21,8 @@ def connectGPIB(ipAddress,gpibAddress):
     #Set output to GPIB
     gpibObj.command("OUTX0")
     # Print IDN
-    print("Instrument ID: ",
-    idnString=gpibObj.query("*IDN?"))
+    print("Instrument ID: ")
+    idnString=gpibObj.query("*IDN?")
     print(idnString.splitlines()[-1])
     time.sleep(0.1)
     return(gpibObj)
