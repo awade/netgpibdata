@@ -14,12 +14,12 @@ import netgpib
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress)
-    print 'Connected.'
-    print "Instrument ID: ",
-    idnString=gpibObj.query("ID?")
-    print idnString.splitlines()[-1]
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress))
+    print('Connected.')
+    print("Instrument ID: ",
+    idnString=gpibObj.query("ID?"))
+    print(idnString.splitlines()[-1])
     return(gpibObj)
 
 
@@ -171,7 +171,7 @@ def writeParams(gpibObj, paramFile):
     # Averages
     nAvg = str(int(gpibObj.query('VAVG?')))
 
-    print "Writing to the parameter file."
+    print("Writing to the parameter file.")
 
     paramFile.write('#---------- Measurement Parameters ------------\n')
     paramFile.write('# Start Frequency (Hz): '+fStart+'\n')

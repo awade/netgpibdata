@@ -112,6 +112,7 @@ class netGPIB:
         if sleep is None:
             sleep=self.tSleep
         if self.log:
+            # TODO: make this print command python3 friendly
             print >>sys.stderr, "?? %s" % string
         self.netSock.send(string+"\n")
         if not self.auto:
@@ -119,6 +120,7 @@ class netGPIB:
             self.netSock.send("++read eoi\n") #Change to listening mode
         ret = self.getData(buf)
         if self.log:
+            # TODO: make this print command python3 friendly
             print >>sys.stderr, "== %s" % ret.strip()
         return ret
 
@@ -138,6 +140,7 @@ class netGPIB:
         if sleep is None:
             sleep=self.tSleep
         if self.log:
+            # TODO: make this print command python3 friendly
             print >>sys.stderr, ">> %s" % string
         self.netSock.send(string+"\n")
         time.sleep(sleep)

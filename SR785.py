@@ -15,15 +15,15 @@ import termstatus
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
-    print 'Connected.'
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0))
+    print('Connected.')
     #Set output to GPIB
     gpibObj.command("OUTX0")
     # Print IDN
-    print "Instrument ID: ",
-    idnString=gpibObj.query("*IDN?")
-    print idnString.splitlines()[-1]
+    print("Instrument ID: ",
+    idnString=gpibObj.query("*IDN?"))
+    print(idnString.splitlines()[-1])
     time.sleep(0.1)
     return(gpibObj)
 
@@ -109,7 +109,7 @@ def downloadDisplay(gpibObj, disp):
     freq=[]
     data=[]
     accomplished=0
-    print 'Reading data'
+    print('Reading data')
     progressInfo=termstatus.statusTxt('0%')
 
     for bin in range(numPoint): #Loop for frequency bins
@@ -178,10 +178,10 @@ def measure(gpibObj, measType):
     measuring = True
 
     if measType == 'Spectrum':
-        print 'Starting ' + measType + ' measurement...'
+        print('Starting ' + measType + ' measurement...')
         time.sleep(0.1)
-        print '    Averages completed:',
-        avTot=int(gpibObj.query('FAVN?0'))
+        print('    Averages completed:',
+        avTot=int(gpibObj.query('FAVN?0')))
         avgStatus=termstatus.progressBar(20,avTot)
         while measuring:
             measuring = not int(gpibObj.query('DSPS?1'))
@@ -194,7 +194,7 @@ def measure(gpibObj, measType):
         gpibObj.command('ASCL1') #Auto scale
 
     elif measType =='TF':
-        print 'Starting ' + measType + ' measurement...'
+        print('Starting ' + measType + ' measurement...')
         time.sleep(1)
         numPoints=int(gpibObj.query('SNPS?0')) #Number of points
         progressInfo=termstatus.progressBar(20,numPoints)
@@ -455,7 +455,7 @@ def writeParams(gpibObj, paramFile):
 
     SrcOn = gpibObj.query("SRCO?")
 
-    print "Writing to the parameter file."
+    print("Writing to the parameter file.")
 
     paramFile.write('#---------- Measurement Setup ------------\n')
 
@@ -548,7 +548,7 @@ def writeParams(gpibObj, paramFile):
 
 def setParameters(gpibObj,params):
     # Read dictionary of settings to set up the instrument
-    print 'Setting up parameters for the measurement...'
+    print('Setting up parameters for the measurement...')
 
     if params['measType'] == 'Spectrum':
         if params['numOfPoints'] <= 100:

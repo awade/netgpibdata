@@ -95,14 +95,14 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
 
     # If new measurement is requested, do it!
     if noParam is False:
-        print 'Executing measurement specified in '+paramFile
+        print('Executing measurement specified in '+paramFile)
         inst.setParameters(gpibObj,params)
         inst.measure(gpibObj,params)
 
     params['measType']='Spectrum'
     params['dataMode']=(gpibObj.query('AUNITS?')[:-2])
 
-    print 'Detected Units: '+params['dataMode']
+    print('Detected Units: '+params['dataMode'])
 
     # Let the instrument catch up, then download the data
     time.sleep(2)
@@ -121,11 +121,11 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         inst.writeParams(gpibObj, dataFile)
         inst.writeData(dataFile, freq, data)
 
-    print "Done!"
+    print("Done!")
     gpibObj.close()
 
     if params['plotResult'] is True:
-        print 'Plotting!'
+        print('Plotting!')
         dataArray = np.transpose(np.vstack((np.array(freq,dtype='float'),
                                             np.array(data,dtype='float'))))
 
@@ -137,7 +137,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
             refFiles = [ rf for rf in os.listdir(params['refDir'])
                          if (params['nameRoot'] in rf and '.txt' in rf and
                              rf != dataFileName)]
-            print 'Found ' + str(len(refFiles)) + ' references; plotting...'
+            print('Found ' + str(len(refFiles)) + ' references; plotting...')
 
             # Plot each reference in order
             refFiles.sort()
@@ -167,7 +167,7 @@ def main(paramFile=None, filename=None, ipAddress=None, gpibAddress=None,
         try:
             plt.show()
         except:
-            print 'Failed to show plot! X11 problem?'
+            print('Failed to show plot! X11 problem?')
 
 
 if __name__ == "__main__":
@@ -232,9 +232,9 @@ if __name__ == "__main__":
 
     elif args.template:
         import shutil
-        print 'Copying ' +SPtemplateFile+ ' to ' + os.getcwd()
+        print('Copying ' +SPtemplateFile+ ' to ' + os.getcwd())
         shutil.copyfile(SPtemplateFile, os.getcwd()+'/SPHP8591Etemplate.yml')
-        print 'Done!'
+        print('Done!')
 
     elif args.ipaddress is None or args.gpibaddress is None:
         parser.error('Must specify IP and GPIB addresses!\n')

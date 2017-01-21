@@ -16,12 +16,12 @@ import netgpib
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print 'Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress,tSleep=0.2)
-    print 'Connected.'
-    print "Instrument ID: ",
-    idnString=gpibObj.query("*IDN?")
-    print idnString.splitlines()[-1]
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress,tSleep=0.2))
+    print('Connected.')
+    print("Instrument ID: ",
+    idnString=gpibObj.query("*IDN?"))
+    print(idnString.splitlines()[-1])
     return(gpibObj)
 
 
@@ -164,7 +164,7 @@ def multiMeasure(gpibObj, params):
                 gpibObj.command('CHAN2')
             gpibObj.command('STAR '+str(fLims[ii]))
             gpibObj.command('STOP '+str(fLims[ii+1]))
-            print 'Segment '+str(ii+1)+' of '+str(nseg)+'...'
+            print('Segment '+str(ii+1)+' of '+str(nseg)+'...')
             measure(gpibObj,params)
             (fi, di) =download(gpibObj)
 
@@ -182,7 +182,7 @@ def measure(gpibObj, params):
     gpibObj.command('*SRE 4')
     gpibObj.command('ESNB 1')
 
-    print 'Preparing to trigger...'
+    print('Preparing to trigger...')
     nDisp = int(gpibObj.query('DUAC?')[0])+1
     nAvg = str(params.get('averages',1))
 
@@ -196,7 +196,7 @@ def measure(gpibObj, params):
     gpibObj.command('AVER ON')
     gpibObj.command('AVERFACT '+nAvg)
     gpibObj.command('AVERREST')
-    print 'Taking '+nAvg+' averages...'
+    print('Taking '+nAvg+' averages...')
     gpibObj.command('NUMG '+nAvg)
 
     while not int(gpibObj.srq()):
@@ -380,7 +380,7 @@ def writeParams(gpibObj, paramFile):
     # Averages
     nAvg = str(int(gpibObj.query('AVERFACT?')))
 
-    print "Writing to the parameter file."
+    print("Writing to the parameter file.")
 
     paramFile.write('#---------- Measurement Parameters ------------\n')
     paramFile.write('# Start Frequency (Hz): '+fStart+'\n')

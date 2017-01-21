@@ -1,2 +1,3 @@
 - Binary data downloading is faster
 - Erroneous last point on SR785 TFs
+- Remaining print commands that are not python3 freindly
