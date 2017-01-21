@@ -25,4 +25,10 @@ In ubuntu, these can be installed via `sudo apt-get install python-numpy python-
 
 (Older scripts are included in the "oldScripts" directory. )
 
-
+---------
+Thoughts on changes:
+- Need to make python3 ready, mostly being tripped up by print comands right now;
+- More flexablity in use of template files, right now frequency range can only be defined in the template files, it would be nice if all the options in the .yml file could be manually specified so that scripting of batch collects of data can be done more easy;
+- Build in support for multispanning of measurments for smooth stitching of logarithmic spans.  Feed in full freq range, num of spans and and desired resolution bandwidth
+- Some settings like video bandwidth, etc are not included in AG4395A config files
+- Also general dir for cloning onto my local machines so I have the same code and config.yml s on all.
