@@ -15,8 +15,8 @@ import termstatus
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0))
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...')
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress, '\004',0)
     print('Connected.')
     #Set output to GPIB
     gpibObj.command("OUTX0")
@@ -180,8 +180,8 @@ def measure(gpibObj, measType):
     if measType == 'Spectrum':
         print('Starting ' + measType + ' measurement...')
         time.sleep(0.1)
-        print('    Averages completed:',
-        avTot=int(gpibObj.query('FAVN?0')))
+        print('    Averages completed:')
+        avTot=int(gpibObj.query('FAVN?0'))
         avgStatus=termstatus.progressBar(20,avTot)
         while measuring:
             measuring = not int(gpibObj.query('DSPS?1'))
