@@ -1,0 +1,25 @@
+# Analyzer Details
+deviceName:   AG4395A 
+ipAddress:    10.0.1.61     ## IP or hostname of GPIB Device
+gpibAddress:  10        ## Port of GPIB device, 10 is default 
+
+# Output Parameters
+saveDir:      ./        ## Path where output is saved, use [./] for current dir
+nameRoot:     SPAG4395A ## Filename root for output files
+plotResult:   False      ## Whether to plot measured data when finished [True/False]
+plotRefs:     False     ## Whether to plot references with same nameRoot [True/False]
+refDir:       ./        ## Where the reference trace files are stored
+plotScales:   Log,Log   ## Scaling of x and y axes, respectively. [Linear,Log],[Log,Log], etc.
+saveFig:      False     ## If plotResult is true, saves a pdf with same filename [True/False]
+plotTitle:    AG4395A Spectrum Measurement
+
+# Measurement Parameters
+measType:     Spectrum          
+startFreq:    138.063Hz     ## Start frequency
+stopFreq:     1.89991kHz      ## Stop frequency, 300MHz max
+specType:     Noise     ## [Noise] (i.e. PSD units) or [Spectrum] (power units)
+dualChannel:  Single    ## [ Single ]/[ Dual ]
+channels:     A         ## [R], [A], [B] for single channel. [RA],[AB], etc. for dual
+attenuation:  0         ## dB of input attenuation, i.e. [40], or [auto]
+averages:     5         ## Number of averages 
+bwSpanRatio:  1.7027       ## Set resolution bandwidth / span ratio, in percent. [0.01] to [10]
