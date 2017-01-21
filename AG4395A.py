@@ -16,11 +16,11 @@ import netgpib
 
 
 def connectGPIB(ipAddress,gpibAddress):
-    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...',
-    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress,tSleep=0.2))
+    print('Connecting to '+str(ipAddress)+':'+str(gpibAddress)+'...')
+    gpibObj=netgpib.netGPIB(ipAddress, gpibAddress,tSleep=0.2)
     print('Connected.')
-    print("Instrument ID: ",
-    idnString=gpibObj.query("*IDN?"))
+    print("Instrument ID: ")
+    idnString=gpibObj.query("*IDN?")
     print(idnString.splitlines()[-1])
     return(gpibObj)
 
