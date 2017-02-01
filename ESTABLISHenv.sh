@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# In the event that matplotlib refuses to work properly add a file ~/.matplotlib to the home directory and add the following line "backend: TkAgg".
+
 dir=$(pwd)
 echo $dir
 
